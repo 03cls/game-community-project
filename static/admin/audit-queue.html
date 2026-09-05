@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>审核队列 — 管理后台</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+<div class="admin-layout">
+  <aside class="admin-side" id="adminSide"></aside>
+  <main class="admin-main">
+    <h2 class="section-title">⚖️ 审核队列（AI 存疑 / 审核中内容）</h2>
+    <div class="card table-wrap mb-16">
+      <table class="data">
+        <thead><tr><th>标题</th><th>作者</th><th>关联游戏</th><th>AI 风险分</th><th>AI 判定原因</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="pendingBody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">🤖 AI 审核日志</h2>
+    <div class="card table-wrap mb-16">
+      <table class="data">
+        <thead><tr><th>文章</th><th>审核类型</th><th>风险分</th><th>命中原因 / 处理记录</th><th>操作人</th><th>时间</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">💬 评论管理</h2>
+    <div class="card table-wrap">
+      <table class="data">
+        <thead><tr><th>评论内容</th><th>评论人</th><th>所属评测</th><th>时间</th><th>操作</th></tr></thead>
+        <tbody id="commentBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="../js/mock.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/common.js"></script>
+<script>
+if (!Auth.mountAdmin('audit')) throw new Error('redirect');
+
+async function loadPending() {
+  var data = await Api.get('/admin/reviews/pending');
+  var body = document.getElementById('pendingBody');
+  if (!data.items.length) { body.innerHTML = '<tr><td colspan="7" class="empty"><div class="icon">🎉</div>队列为空，没有待复核内容</td></tr>'; return; }
+  body.innerHTML = data.items.map(function (r) {
+    return '<tr><td style="max-width:200px;"><b>' + U.esc(r.title) + '</b></td>'
+      + '<td>' + U.esc(r.author_name) + '</td>'
+      + '<td class="dim">' + U.esc(r.game_name) + '</td>'
+      + '<td><span class="score">' + (r.audit_score != null ? r.audit_score : '-') + '</span></td>'
+      + '<td class="dim" style="max-width:240px;">' + U.esc(r.audit_reason || '-') + '</td>'
+      + '<td>' + U.reviewBadge(r.status) + '</td>'
+      + '<td class="actions">'
+      + '<button class="btn btn-sm btn-primary" onclick="decide(' + r.id + ',\'pass\')">✅ 通过</button>'
+      + '<button class="btn btn-sm btn-danger" onclick="decide(' + r.id + ',\'reject\')">❌ 驳回</button>'
+      + '</td></tr>';
+  }).join('');
+}
+
+window.decide = async function (id, action) {
+  var reason = prompt(action === 'pass' ? '可填写通过理由（可选）：' : '请填写驳回理由：', action === 'pass' ? '内容正常，复核通过' : '');
+  if (reason === null) return;
+  try {
+    var r = await Api.post('/admin/reviews/' + id + '/audit-decision', { action: action, reason: reason });
+    U.toast(r.message, 'success');
+    loadPending(); loadLogs();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+async function loadLogs() {
+  var data = await Api.get('/admin/audit/logs');
+  document.getElementById('logBody').innerHTML = data.items.map(function (l) {
+    var type = l.audit_type === 'ai' ? '<span class="badge badge-blue">AI</span>' : '<span class="badge badge-amber">人工</span>';
+    var score = l.risk_score != null ? (l.risk_score >= 80 ? '<span class="badge badge-red">' + l.risk_score + '</span>' : l.risk_score >= 50 ? '<span class="badge badge-amber">' + l.risk_score + '</span>' : '<span class="badge badge-green">' + l.risk_score + '</span>') : '-';
+    return '<tr><td class="dim">' + U.esc(l.review_title) + '</td><td>' + type + '</td><td>' + score + '</td>'
+      + '<td class="dim" style="max-width:320px;">' + U.esc(l.reason) + '</td>'
+      + '<td class="dim">' + (l.operator_id === 1 ? 'system' : 'admin') + '</td>'
+      + '<td class="dim">' + U.fmtDate(l.created_at) + '</td></tr>';
+  }).join('');
+}
+
+async function loadComments() {
+  var data = await Api.get('/admin/comments');
+  document.getElementById('commentBody').innerHTML = data.items.map(function (c) {
+    return '<tr><td style="max-width:320px;">' + U.esc(c.content) + '</td>'
+      + '<td>' + U.esc(c.author) + '</td>'
+      + '<td class="dim">' + U.esc(c.review_title) + '</td>'
+      + '<td class="dim">' + U.fmtDate(c.created_at) + '</td>'
+      + '<td class="actions"><button class="btn btn-sm btn-danger" onclick="delComment(' + c.id + ')">删除违规评论</button></td></tr>';
+  }).join('');
+}
+
+window.delComment = async function (id) {
+  if (!confirm('确认删除该评论？')) return;
+  await Api.del('/admin/comments/' + id);
+  U.toast('评论已删除', 'info');
+  loadComments();
+};
+
+loadPending(); loadLogs(); loadComments();
+</script>
+</body>
+</html>

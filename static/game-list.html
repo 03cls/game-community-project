@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>游戏库 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="wrap page">
+  <div class="grid" style="grid-template-columns: 220px 1fr; gap:22px; align-items:start;">
+
+    <!-- 筛选侧栏 -->
+    <div class="card filter-side">
+      <div class="filter-group">
+        <h4>游戏分类</h4>
+        <div id="catFilter"></div>
+      </div>
+      <div class="filter-group">
+        <h4>排序方式</h4>
+        <label class="radio-line"><input type="radio" name="sort" value="hot" checked> 综合热度</label>
+        <label class="radio-line"><input type="radio" name="sort" value="newest"> 发布时间（新→旧）</label>
+        <label class="radio-line"><input type="radio" name="sort" value="score"> 评分最高</label>
+      </div>
+      <div class="filter-group">
+        <h4>关键字搜索</h4>
+        <input class="input" id="kwInput" placeholder="游戏名 / 标签 / 类型">
+      </div>
+      <button class="btn btn-block" onclick="resetFilter()">重置筛选</button>
+    </div>
+
+    <!-- 列表 -->
+    <div>
+      <div class="flex-between mb-16">
+        <span class="muted" id="resultInfo">加载中…</span>
+        <span class="dim">数据来源：Steam 热门游戏</span>
+      </div>
+      <div class="grid grid-3" id="gameGrid"><div class="loading" style="grid-column:1/-1;">⏳ 加载中…</div></div>
+      <div id="pager"></div>
+    </div>
+  </div>
+</div>
+
+<div id="footerSlot"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/common.js"></script>
+<script>
+Auth.mountNav('games');
+document.getElementById('footerSlot').innerHTML = U.footer();
+
+var state = { page: 1, category_id: '', sort: 'hot', keyword: U.qs('keyword') };
+
+function catTag(c, active) {
+  return '<span class="tag clickable ' + (active ? 'active' : '') + '" onclick="selectCat(' + c.id + ')">' + U.esc(c.name) + '</span>';
+}
+
+async function loadCats() {
+  var data = await Api.get('/games?page=1&page_size=1');
+  document.getElementById('catFilter').innerHTML =
+    '<span class="tag clickable ' + (state.category_id === '' ? 'active' : '') + '" onclick="selectCat(0)">全部</span>' +
+    data.categories.map(function (c) { return catTag(c, state.category_id === c.id); }).join('');
+}
+
+function selectCat(id) {
+  state.category_id = id === 0 ? '' : id;
+  state.page = 1;
+  loadCats(); loadGames();
+}
+
+function resetFilter() {
+  state = { page: 1, category_id: '', sort: 'hot', keyword: '' };
+  document.getElementById('kwInput').value = '';
+  U.$all('input[name=sort]').forEach(function (r) { r.checked = r.value === 'hot'; });
+  loadCats(); loadGames();
+}
+
+async function loadGames() {
+  var q = '/games?page=' + state.page + '&page_size=9&sort=' + state.sort
+    + (state.category_id ? '&category_id=' + state.category_id : '')
+    + (state.keyword ? '&keyword=' + encodeURIComponent(state.keyword) : '');
+  var data = await Api.get(q);
+  document.getElementById('resultInfo').textContent =
+    '共 ' + data.total + ' 款游戏 · 第 ' + data.page + '/' + data.total_pages + ' 页';
+  document.getElementById('gameGrid').innerHTML = data.items.length
+    ? data.items.map(U.gameCard).join('')
+    : '<div class="empty" style="grid-column:1/-1;"><div class="icon">🎮</div>没有找到符合条件的游戏</div>';
+  document.getElementById('pager').innerHTML = U.pagination(data.total_pages, data.page, function (p) {
+    state.page = p; loadGames(); window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
+document.getElementById('kwInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { state.keyword = this.value.trim(); state.page = 1; loadGames(); }
+});
+U.$all('input[name=sort]').forEach(function (r) {
+  r.addEventListener('change', function () { state.sort = this.value; state.page = 1; loadGames(); });
+});
+if (state.keyword) document.getElementById('kwInput').value = state.keyword;
+
+loadCats(); loadGames();
+</script>
+</body>
+</html>

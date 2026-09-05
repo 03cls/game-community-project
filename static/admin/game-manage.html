@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>游戏管理 — 管理后台</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+<div class="admin-layout">
+  <aside class="admin-side" id="adminSide"></aside>
+  <main class="admin-main">
+    <h2 class="section-title">🎮 游戏库管理 <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="openGameModal()">＋ 新增游戏</button></h2>
+    <div class="card table-wrap mb-16">
+      <table class="data">
+        <thead><tr><th>封面</th><th>名称</th><th>开发商</th><th>分类</th><th>评分</th><th>发行日</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="gameBody"></tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">📂 游戏分类管理 <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="addCategory()">＋ 新增分类</button></h2>
+    <div class="card table-wrap">
+      <table class="data">
+        <thead><tr><th>ID</th><th>分类名称</th><th>操作</th></tr></thead>
+        <tbody id="catBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="../js/mock.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/common.js"></script>
+<script>
+if (!Auth.mountAdmin('games')) throw new Error('redirect');
+
+var categories = [];
+
+async function loadGames() {
+  var data = await Api.get('/admin/games');
+  categories = data.categories;
+  document.getElementById('gameBody').innerHTML = data.items.map(function (g) {
+    return '<tr><td><img src="' + U.esc(g.cover_url) + '" style="width:80px; aspect-ratio:16/9; object-fit:cover; border-radius:6px;"></td>'
+      + '<td><b>' + U.esc(g.name) + '</b><br><span class="dim">' + U.esc(g.name_en) + '</span></td>'
+      + '<td class="dim">' + U.esc(g.developer || '-') + '</td>'
+      + '<td><span class="tag">' + U.esc(g.category_name) + '</span></td>'
+      + '<td><span class="score">' + g.average_score.toFixed(1) + '</span></td>'
+      + '<td class="dim">' + U.fmtDate(g.release_date) + '</td>'
+      + '<td>' + (g.is_online ? '<span class="badge badge-green">上架中</span>' : '<span class="badge badge-gray">已下架</span>') + '</td>'
+      + '<td class="actions">'
+      + '<button class="btn btn-sm" onclick="openGameModal(' + g.id + ')">编辑</button>'
+      + '<button class="btn btn-sm btn-danger" onclick="toggleOnline(' + g.id + ',' + (g.is_online ? 'false' : 'true') + ')">' + (g.is_online ? '下架' : '上架') + '</button>'
+      + '</td></tr>';
+  }).join('');
+}
+
+window.toggleOnline = async function (id, online) {
+  try {
+    await Api.put('/admin/games/' + id, { is_online: online });
+    U.toast(online ? '游戏已上架' : '游戏已下架', 'success');
+    loadGames();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+window.openGameModal = async function (id) {
+  if (!categories.length) { var d = await Api.get('/admin/games'); categories = d.categories; }
+  var g = null;
+  if (id) {
+    var list = await Api.get('/admin/games');
+    g = list.items.filter(function (x) { return x.id === id; })[0];
+  }
+  var html = '<h3>' + (g ? '编辑游戏' : '新增游戏') + '</h3>'
+    + '<div class="form-group"><label>游戏中文名 *</label><input class="input" id="mName" value="' + (g ? U.esc(g.name) : '') + '"></div>'
+    + '<div class="form-row"><div class="form-group"><label>英文名</label><input class="input" id="mNameEn" value="' + (g ? U.esc(g.name_en) : '') + '"></div>'
+    + '<div class="form-group"><label>开发商</label><input class="input" id="mDev" value="' + (g ? U.esc(g.developer || '') : '') + '"></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>发行日期</label><input class="input" id="mDate" type="date" value="' + (g ? g.release_date : '2025-01-01') + '"></div>'
+    + '<div class="form-group"><label>分类</label><select class="input" id="mCat">'
+    + categories.map(function (c) { return '<option value="' + c.id + '"' + (g && g.category_id === c.id ? ' selected' : '') + '>' + U.esc(c.name) + '</option>'; }).join('')
+    + '</select></div></div>'
+    + '<div class="form-group"><label>封面图 URL（留空自动生成风格图）</label><input class="input" id="mCover" value="' + (g ? U.esc(g.cover_url) : '') + '"></div>'
+    + '<div class="form-group"><label>标签（逗号分隔）</label><input class="input" id="mTags" value="' + (g ? (g.tags || []).join(',') : '') + '"></div>'
+    + '<div class="form-group"><label>简介</label><textarea class="input" id="mDesc" rows="3">' + (g ? U.esc(g.description) : '') + '</textarea></div>'
+    + '<div class="modal-foot"><button class="btn" onclick="U.closeModal()">取消</button>'
+    + '<button class="btn btn-primary" onclick="saveGame(' + (g ? g.id : 'null') + ')">保存</button></div>';
+  U.openModal(html);
+};
+
+window.saveGame = async function (id) {
+  var body = {
+    name: document.getElementById('mName').value.trim(),
+    name_en: document.getElementById('mNameEn').value.trim(),
+    developer: document.getElementById('mDev').value.trim(),
+    release_date: document.getElementById('mDate').value,
+    category_id: parseInt(document.getElementById('mCat').value, 10),
+    cover_url: document.getElementById('mCover').value.trim(),
+    tags: document.getElementById('mTags').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean),
+    description: document.getElementById('mDesc').value.trim()
+  };
+  if (!body.name) { U.toast('游戏名称必填', 'error'); return; }
+  try {
+    if (id) await Api.put('/admin/games/' + id, body);
+    else await Api.post('/admin/games', body);
+    U.toast('保存成功', 'success');
+    U.closeModal();
+    loadGames();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+/* ---------- 分类 ---------- */
+async function loadCats() {
+  var data = await Api.get('/admin/categories');
+  categories = data.items;
+  document.getElementById('catBody').innerHTML = data.items.map(function (c) {
+    return '<tr><td>' + c.id + '</td><td>' + U.esc(c.name) + '</td>'
+      + '<td class="actions"><button class="btn btn-sm" onclick="renameCat(' + c.id + ',\'' + U.esc(c.name) + '\')">改名</button>'
+      + '<button class="btn btn-sm btn-danger" onclick="delCat(' + c.id + ')">删除</button></td></tr>';
+  }).join('');
+}
+
+window.addCategory = async function () {
+  var name = prompt('请输入新分类名称：');
+  if (!name) return;
+  try {
+    await Api.post('/admin/categories', { name: name.trim() });
+    U.toast('分类已添加', 'success');
+    loadCats();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+window.renameCat = async function (id, oldName) {
+  var name = prompt('修改分类名称：', oldName);
+  if (!name) return;
+  try {
+    await Api.put('/admin/categories/' + id, { name: name.trim() });
+    U.toast('已更新', 'success');
+    loadCats();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+window.delCat = async function (id) {
+  if (!confirm('删除后不可恢复，且分类下有游戏时无法删除。确认删除？')) return;
+  try {
+    await Api.del('/admin/categories/' + id);
+    U.toast('分类已删除', 'info');
+    loadCats();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+loadGames(); loadCats();
+</script>
+</body>
+</html>

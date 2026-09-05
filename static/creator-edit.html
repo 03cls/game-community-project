@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>评测编辑 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="wrap page">
+  <div class="grid" style="grid-template-columns: 1fr 360px; gap:20px; align-items:start;">
+
+    <!-- 编辑器区 -->
+    <div>
+      <div class="card mb-16">
+        <div class="form-row">
+          <div class="form-group" style="flex:2;">
+            <label>标题</label>
+            <input class="input" id="title" placeholder="给评测起个吸引人的标题…">
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>关联游戏</label>
+            <select class="input" id="gameSelect"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>标签（逗号分隔）</label>
+          <input class="input" id="tags" placeholder="例如：魂系, 开放世界, 年度游戏">
+        </div>
+      </div>
+
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div class="editor-toolbar">
+          <button type="button" onclick="fmt('bold')"><b>B</b></button>
+          <button type="button" onclick="fmt('italic')"><i>I</i></button>
+          <button type="button" onclick="fmt('h2')">H2</button>
+          <button type="button" onclick="fmt('ul')">• 列表</button>
+          <button type="button" onclick="fmt('link')">🔗 链接</button>
+          <button type="button" onclick="fmt('p')">¶ 正文</button>
+        </div>
+        <div class="editor-area" id="editor" contenteditable="true" data-placeholder="在这里写下你的评测正文… 可以使用右侧 AI 助手帮你生成大纲、润色文案。"></div>
+      </div>
+
+      <div class="flex mt-16" style="justify-content:flex-end; gap:10px;">
+        <a class="btn" href="creator-work.html">← 返回工作台</a>
+        <button class="btn" id="saveDraftBtn">💾 保存草稿</button>
+        <button class="btn btn-primary" id="submitBtn">🚀 提交审核（AI 自动审核）</button>
+      </div>
+    </div>
+
+    <!-- AI 助手 -->
+    <div class="ai-panel" style="position:sticky; top:76px;">
+      <div class="ai-title">🤖 AI 攻略创作助手</div>
+      <p class="dim" style="font-size:12px; margin-bottom:10px;">自动携带当前关联游戏与正文上下文</p>
+      <div class="ai-chips">
+        <span class="tag" onclick="quickAi('outline')">生成评测大纲</span>
+        <span class="tag" onclick="quickAi('tips')">通关思路</span>
+        <span class="tag" onclick="quickAi('polish')">润色文案</span>
+        <span class="tag" onclick="quickAi('pros')">分析优缺点</span>
+      </div>
+      <div class="chat-box" id="chatBox">
+        <div class="chat-msg ai">你好！我是你的 AI 写作助手 ✨<br>我可以帮你生成评测大纲、梳理通关思路、润色文案、分析游戏优缺点。点击上方标签快速开始吧～</div>
+      </div>
+      <div class="ai-input-row">
+        <input class="input" id="aiInput" placeholder="输入消息，回车发送…">
+        <button class="btn btn-primary" id="aiSend">发送</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="footerSlot"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/common.js"></script>
+<script>
+if (!Auth.requireRole('creator')) throw new Error('redirect');
+Auth.mountNav('creator');
+document.getElementById('footerSlot').innerHTML = U.footer();
+
+var editId = U.qs('id') ? parseInt(U.qs('id'), 10) : null;
+var games = [];
+
+async function init() {
+  var data = await Api.get('/games?page=1&page_size=50&sort=hot');
+  games = data.items;
+  document.getElementById('gameSelect').innerHTML = games.map(function (g) {
+    return '<option value="' + g.id + '">' + g.name + '（' + g.name_en + '）</option>';
+  }).join('');
+
+  if (editId) {
+    var list = await Api.get('/creator/reviews');
+    var rv = list.items.filter(function (r) { return r.id === editId; })[0];
+    if (rv) {
+      document.getElementById('title').value = rv.title;
+      document.getElementById('gameSelect').value = rv.game_id;
+      document.getElementById('tags').value = (rv.tags || []).join(',');
+      document.getElementById('editor').innerHTML = rv.content || '';
+      if (rv.status === 'published') U.toast('已发布文章为只读', 'info');
+    }
+  }
+}
+
+/* 富文本工具 */
+window.fmt = function (cmd) {
+  var editor = document.getElementById('editor');
+  editor.focus();
+  if (cmd === 'h2') document.execCommand('formatBlock', false, 'h2');
+  else if (cmd === 'p') document.execCommand('formatBlock', false, 'p');
+  else if (cmd === 'ul') document.execCommand('insertUnorderedList', false, null);
+  else if (cmd === 'link') {
+    var url = prompt('输入链接地址：', 'https://');
+    if (url) document.execCommand('createLink', false, url);
+  }
+  else document.execCommand(cmd, false, null);
+};
+
+function collect() {
+  return {
+    title: document.getElementById('title').value.trim(),
+    game_id: parseInt(document.getElementById('gameSelect').value, 10),
+    tags: document.getElementById('tags').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean),
+    content: document.getElementById('editor').innerHTML
+  };
+}
+
+async function saveDraft() {
+  var body = collect();
+  if (!body.title) { U.toast('请先填写标题', 'error'); return null; }
+  try {
+    if (editId) { await Api.put('/reviews/' + editId, body); U.toast('草稿已保存', 'success'); }
+    else {
+      var r = await Api.post('/reviews', body);
+      editId = r.id;
+      history.replaceState(null, '', 'creator-edit.html?id=' + editId);
+      U.toast('草稿已创建', 'success');
+    }
+    return true;
+  } catch (e) { U.toast(e.message, 'error'); return false; }
+}
+
+document.getElementById('saveDraftBtn').onclick = saveDraft;
+
+document.getElementById('submitBtn').onclick = async function () {
+  var body = collect();
+  if (!body.title) { U.toast('请先填写标题', 'error'); return; }
+  if (!body.content || body.content.replace(/<[^>]+>/g, '').trim().length < 20) {
+    U.toast('正文内容太少了，至少写点什么吧', 'error'); return;
+  }
+  /* 先保存再提交 */
+  var ok = await saveDraft();
+  if (!ok) return;
+  try {
+    var res = await Api.post('/reviews/' + editId + '/submit-audit');
+    if (res.status === 'published') {
+      U.toast('🎉 AI 审核通过，文章已发布！', 'success');
+      setTimeout(function () { location.href = 'creator-work.html'; }, 1500);
+    } else if (res.status === 'rejected') {
+      U.toast('❌ AI 驳回：' + res.audit.reasons.join('；'), 'error');
+      setTimeout(function () { location.href = 'creator-work.html'; }, 2000);
+    } else {
+      U.toast('⏳ 内容存疑，已转入管理员人工复核队列', 'info');
+      setTimeout(function () { location.href = 'creator-work.html'; }, 1800);
+    }
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+/* ---------- AI 助手 ---------- */
+function addMsg(text, who) {
+  var box = document.getElementById('chatBox');
+  var el = document.createElement('div');
+  el.className = 'chat-msg ' + who;
+  el.textContent = text;
+  box.appendChild(el);
+  if (who === 'ai') {
+    var actions = document.createElement('div');
+    actions.style.cssText = 'margin-top:6px;';
+    actions.innerHTML = '<button class="btn btn-sm btn-primary">📋 复制到编辑器</button>';
+    actions.querySelector('button').onclick = function () {
+      var html = text.split('\n').map(function (line) {
+        if (/^[一二三四五六1-6][、.)．]/.test(line.trim()) || /^[+·]/.test(line.trim())) return '<p>' + U.esc(line) + '</p>';
+        return '<p>' + U.esc(line) + '</p>';
+      }).join('');
+      document.getElementById('editor').innerHTML += html;
+      U.toast('已插入到编辑器末尾', 'success');
+    };
+    el.appendChild(actions);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+async function askAi(message, action) {
+  addMsg(message, 'me');
+  var body = collect();
+  var box = document.getElementById('chatBox');
+  var loading = document.createElement('div');
+  loading.className = 'chat-msg ai';
+  loading.textContent = 'AI 思考中…（3-8 秒）';
+  box.appendChild(loading);
+  box.scrollTop = box.scrollHeight;
+  try {
+    var res = await Api.post('/ai/creator-assistant', {
+      game_id: body.game_id,
+      content_context: body.content,
+      message: message,
+      action: action || ''
+    });
+    loading.remove();
+    addMsg(res.reply, 'ai');
+  } catch (e) {
+    loading.remove();
+    addMsg('出错了：' + e.message, 'ai');
+  }
+}
+
+window.quickAi = function (action) {
+  var map = { outline: '帮我生成一篇评测大纲', tips: '给我一些通关思路', polish: '帮我润色当前文案', pros: '分析一下这款游戏的优缺点' };
+  askAi(map[action], action);
+};
+
+document.getElementById('aiSend').onclick = function () {
+  var input = document.getElementById('aiInput');
+  if (!input.value.trim()) return;
+  var msg = input.value.trim();
+  input.value = '';
+  askAi(msg, '');
+};
+document.getElementById('aiInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('aiSend').click();
+});
+
+init();
+</script>
+</body>
+</html>

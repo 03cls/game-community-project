@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<title>首页 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="wrap page">
+
+  <div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px; margin-bottom: 8px;">
+    <!-- Hero 轮播 -->
+    <div class="hero" id="hero">
+      <img id="heroImg" src="" alt="">
+      <div class="hero-info">
+        <span class="badge badge-amber" id="heroCat"></span>
+        <h2 id="heroName" style="font-size:26px; margin:8px 0 4px;"></h2>
+        <p class="muted" id="heroDesc" style="max-width:560px;"></p>
+        <div style="margin-top:10px;"><span class="score score-big" id="heroScore"></span></div>
+      </div>
+      <div class="hero-dots" id="heroDots"></div>
+    </div>
+
+    <!-- AI 推荐助手 -->
+    <div class="ai-panel" style="display:flex; flex-direction:column;">
+      <div class="ai-title">🤖 AI 游戏推荐助手</div>
+      <p class="muted" style="font-size:13px; margin-bottom:12px;">基于你的收藏与游玩记录，或输入偏好描述，获取个性化推荐与理由。</p>
+      <textarea class="input" id="prefInput" rows="2" placeholder="可选：描述你的偏好，如「开放世界 剧情向」…"></textarea>
+      <button class="btn btn-primary btn-block mt-16" id="btnRecommend">获取 AI 推荐</button>
+      <div id="recoResult" style="margin-top:14px; overflow-y:auto; flex:1;"></div>
+    </div>
+  </div>
+
+  <!-- 热门游戏 -->
+  <h3 class="section-title mt-24">🔥 热门游戏 <a class="more" href="game-list.html">查看全部 →</a></h3>
+  <div class="grid grid-4" id="hotGames"></div>
+
+  <!-- 最新评测 -->
+  <h3 class="section-title mt-24">📝 最新评测攻略</h3>
+  <div class="grid grid-2" id="latestReviews"></div>
+</div>
+
+<div id="footerSlot"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/common.js"></script>
+<script>
+Auth.mountNav('home');
+document.getElementById('footerSlot').innerHTML = U.footer();
+
+var games = [], heroIdx = 0, heroTimer = null;
+
+async function init() {
+  var data = await Api.get('/games?page=1&page_size=12&sort=hot');
+  games = data.items;
+  renderHero();
+  renderHot();
+  loadReviews();
+}
+
+function renderHero() {
+  var top = games.slice(0, 3);
+  function show(i) {
+    heroIdx = i;
+    var g = top[i];
+    document.getElementById('heroImg').src = g.cover_url;
+    document.getElementById('heroCat').textContent = g.category_name;
+    document.getElementById('heroName').textContent = g.name;
+    document.getElementById('heroDesc').textContent = g.description.slice(0, 70) + '…';
+    document.getElementById('heroScore').textContent = '★ ' + g.average_score.toFixed(1);
+    document.getElementById('hero').onclick = function () { location.href = 'game-detail.html?id=' + g.id; };
+    document.getElementById('heroDots').innerHTML = top.map(function (_, k) {
+      return '<span class="' + (k === i ? 'active' : '') + '" data-i="' + k + '"></span>';
+    }).join('');
+    U.$all('#heroDots span').forEach(function (s) {
+      s.onclick = function (e) { e.stopPropagation(); clearInterval(heroTimer); show(+s.dataset.i); startTimer(); };
+    });
+  }
+  show(0);
+  function startTimer() {
+    heroTimer = setInterval(function () { show((heroIdx + 1) % top.length); }, 4500);
+  }
+  startTimer();
+}
+
+function renderHot() {
+  document.getElementById('hotGames').innerHTML = games.slice(0, 4).map(U.gameCard).join('');
+}
+
+async function loadReviews() {
+  /* 取前几个游戏的已发布评测 */
+  var all = [];
+  for (var i = 0; i < games.length && all.length < 4; i++) {
+    var r = await Api.get('/games/' + games[i].id + '/reviews?page=1');
+    all = all.concat(r.items);
+  }
+  all.sort(function (a, b) { return b.created_at.localeCompare(a.created_at); });
+  document.getElementById('latestReviews').innerHTML = all.slice(0, 4).map(function (r) {
+    return '<div class="card card-hover" onclick="location.href=\'game-detail.html?id=' + r.game_id + '\'">'
+      + '<div class="flex" style="align-items:flex-start; gap:14px;">'
+      + '<img src="' + U.esc(r.game_cover) + '" style="width:130px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; flex-shrink:0;">'
+      + '<div style="min-width:0;"><div class="review-title">' + U.esc(r.title) + '</div>'
+      + '<div class="review-meta" style="margin:6px 0;">🎮 ' + U.esc(r.game_name) + ' · ✍️ ' + U.esc(r.author_name) + '</div>'
+      + '<div class="review-meta">👁 ' + U.fmtNum(r.read_count) + ' · ❤ ' + U.fmtNum(r.like_count) + ' · ' + U.fmtDate(r.created_at) + '</div>'
+      + '</div></div></div>';
+  }).join('');
+}
+
+/* AI 推荐 */
+document.getElementById('btnRecommend').onclick = async function () {
+  if (!Auth.user()) { U.toast('请先登录后再使用 AI 推荐', 'error'); setTimeout(function(){ location.href = 'login.html'; }, 900); return; }
+  var btn = this;
+  btn.disabled = true; btn.textContent = 'AI 分析中…（约 3-8 秒）';
+  var box = document.getElementById('recoResult');
+  box.innerHTML = '<div class="loading">🤖 正在分析你的游戏口味…</div>';
+  try {
+    var res = await Api.post('/ai/game-recommend', { preferences: document.getElementById('prefInput').value.trim() });
+    box.innerHTML = res.recommendations.map(function (r) {
+      return '<div class="reco-card" onclick="location.href=\'game-detail.html?id=' + r.game_id + '\'">'
+        + '<img src="' + U.esc(r.cover_url) + '">'
+        + '<div style="min-width:0;"><b>' + U.esc(r.game_name) + '</b> <span class="score">★' + r.average_score.toFixed(1) + '</span>'
+        + '<p class="muted" style="font-size:12px; margin-top:4px;">' + U.esc(r.reason) + '</p></div></div>';
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<div class="empty">推荐失败：' + U.esc(e.message) + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = '获取 AI 推荐';
+  }
+};
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>用户管理 — 管理后台</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+<div class="admin-layout">
+  <aside class="admin-side" id="adminSide"></aside>
+  <main class="admin-main">
+    <h2 class="section-title">📝 创作者申请处理</h2>
+    <div class="card table-wrap mb-16">
+      <table class="data">
+        <thead><tr><th>申请人</th><th>邮箱</th><th>申请理由</th><th>提交时间</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="applyBody"><tr><td colspan="6" class="loading">加载中…</td></tr></tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">👥 用户管理</h2>
+    <div class="flex mb-16">
+      <input class="input" id="userKw" placeholder="搜索用户名 / 昵称 / 邮箱…" style="max-width:320px;">
+      <button class="btn btn-primary btn-sm" onclick="loadUsers()">搜索</button>
+    </div>
+    <div class="card table-wrap">
+      <table class="data">
+        <thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>邮箱</th><th>角色</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+        <tbody id="userBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="../js/mock.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/common.js"></script>
+<script>
+if (!Auth.mountAdmin('users')) throw new Error('redirect');
+
+async function loadApplies() {
+  var data = await Api.get('/admin/creator-apply');
+  var body = document.getElementById('applyBody');
+  if (!data.items.length) { body.innerHTML = '<tr><td colspan="6" class="empty dim">暂无申请记录</td></tr>'; return; }
+  body.innerHTML = data.items.map(function (a) {
+    var statusMap = { pending: '<span class="badge badge-amber">待审核</span>', approved: '<span class="badge badge-green">已通过</span>', rejected: '<span class="badge badge-red">已驳回</span>' };
+    var ops = a.status === 'pending'
+      ? '<button class="btn btn-sm btn-primary" onclick="dealApply(' + a.id + ',\'approve\')">同意</button> <button class="btn btn-sm btn-danger" onclick="dealApply(' + a.id + ',\'reject\')">驳回</button>'
+      : '<span class="dim">已处理</span>';
+    return '<tr><td>' + U.esc(a.username) + '</td><td class="dim">' + U.esc(a.nickname) + '</td>'
+      + '<td class="dim" style="max-width:280px;">' + U.esc(a.apply_reason) + '</td>'
+      + '<td class="dim">' + U.fmtDate(a.created_at) + '</td><td>' + statusMap[a.status] + '</td><td class="actions">' + ops + '</td></tr>';
+  }).join('');
+}
+
+window.dealApply = async function (id, action) {
+  if (action === 'approve' && !confirm('确认通过该申请？用户将获得创作者权限')) return;
+  if (action === 'reject' && !confirm('确认驳回该申请？')) return;
+  try {
+    var r = await Api.put('/admin/creator-apply/' + id + '/deal', { action: action });
+    U.toast(r.message, 'success');
+    loadApplies(); loadUsers();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+async function loadUsers() {
+  var kw = document.getElementById('userKw').value.trim();
+  var data = await Api.get('/admin/users' + (kw ? '?keyword=' + encodeURIComponent(kw) : ''));
+  document.getElementById('userBody').innerHTML = data.items.map(function (u) {
+    var roleBadge = '<span class="badge ' + Auth.roleBadge[u.role] + '">' + Auth.roleName[u.role] + '</span>';
+    var status = u.is_active ? '<span class="badge badge-green">正常</span>' : '<span class="badge badge-red">已封禁</span>';
+    var ops = '';
+    if (u.role !== 'admin') {
+      ops += u.is_active
+        ? '<button class="btn btn-sm btn-danger" onclick="toggleStatus(' + u.id + ',false)">封禁</button>'
+        : '<button class="btn btn-sm" onclick="toggleStatus(' + u.id + ',true)">解封</button>';
+      if (u.role === 'player') ops += ' <button class="btn btn-sm btn-primary" onclick="setRole(' + u.id + ',\'creator\')">授予创作者</button>';
+      else ops += ' <button class="btn btn-sm" onclick="setRole(' + u.id + ',\'player\')">撤销创作者</button>';
+    } else {
+      ops = '<span class="dim">超级管理员</span>';
+    }
+    return '<tr><td>' + u.id + '</td><td>' + U.esc(u.username) + '</td><td>' + U.esc(u.profile.nickname) + '</td>'
+      + '<td class="dim">' + U.esc(u.email) + '</td><td>' + roleBadge + '</td><td>' + status + '</td>'
+      + '<td class="dim">' + U.fmtDate(u.created_at) + '</td><td class="actions">' + ops + '</td></tr>';
+  }).join('');
+}
+
+window.toggleStatus = async function (id, active) {
+  if (!confirm(active ? '确认解封该用户？' : '确认封禁该用户？')) return;
+  try {
+    var r = await Api.put('/admin/users/' + id + '/status', { is_active: active });
+    U.toast(r.message, 'success');
+    loadUsers();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+window.setRole = async function (id, role) {
+  if (!confirm(role === 'creator' ? '确认授予创作者权限？' : '确认撤销创作者权限？')) return;
+  try {
+    var r = await Api.put('/admin/users/' + id + '/role', { role: role });
+    U.toast(r.message, 'success');
+    loadUsers();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+document.getElementById('userKw').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadUsers(); });
+loadApplies(); loadUsers();
+</script>
+</body>
+</html>

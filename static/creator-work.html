@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>创作者工作台 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="wrap page">
+  <div class="flex-between mb-16">
+    <h2 class="section-title" style="margin-bottom:0;">✍️ 创作者工作台</h2>
+    <a class="btn btn-primary" href="creator-edit.html">＋ 新建评测 / 攻略</a>
+  </div>
+
+  <!-- 数据统计 -->
+  <div class="grid grid-4 mb-16">
+    <div class="card stat-card"><div class="num" id="stPublished" style="color:var(--green);">-</div><div class="label">已发布文章</div></div>
+    <div class="card stat-card"><div class="num" id="stRead" style="color:var(--accent-2);">-</div><div class="label">总阅读量</div></div>
+    <div class="card stat-card"><div class="num" id="stLike" style="color:var(--red);">-</div><div class="label">总点赞数</div></div>
+    <div class="card stat-card"><div class="num" id="stFav" style="color:var(--gold);">-</div><div class="label">总收藏数</div></div>
+  </div>
+
+  <div class="card table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>标题</th><th>关联游戏</th><th>状态</th><th>AI 风险分</th><th>阅读</th><th>点赞</th><th>创建时间</th><th>操作</th></tr>
+      </thead>
+      <tbody id="reviewBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="footerSlot"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/common.js"></script>
+<script>
+if (!Auth.requireRole('creator')) throw new Error('redirect');
+Auth.mountNav('creator');
+document.getElementById('footerSlot').innerHTML = U.footer();
+
+async function init() {
+  var stats = await Api.get('/creator/statistics');
+  document.getElementById('stPublished').textContent = stats.published_count;
+  document.getElementById('stRead').textContent = U.fmtNum(stats.total_read);
+  document.getElementById('stLike').textContent = U.fmtNum(stats.total_like);
+  document.getElementById('stFav').textContent = U.fmtNum(stats.total_favorite);
+  loadReviews();
+}
+
+async function loadReviews() {
+  var data = await Api.get('/creator/reviews');
+  var body = document.getElementById('reviewBody');
+  if (!data.items.length) {
+    body.innerHTML = '<tr><td colspan="8" class="empty"><div class="icon">✍️</div>还没有文章，点击右上角「新建评测」开始创作</td></tr>';
+    return;
+  }
+  body.innerHTML = data.items.map(function (r) {
+    var actions = '';
+    if (r.status === 'draft' || r.status === 'rejected') {
+      actions = '<a class="btn btn-sm" href="creator-edit.html?id=' + r.id + '">编辑</a>'
+        + '<button class="btn btn-sm btn-primary" onclick="submitAudit(' + r.id + ')">提交审核</button>'
+        + '<button class="btn btn-sm btn-danger" onclick="delReview(' + r.id + ')">删除</button>';
+    } else if (r.status === 'published') {
+      actions = '<a class="btn btn-sm" href="game-detail.html?id=' + r.game_id + '">查看</a>'
+        + '<button class="btn btn-sm btn-danger" onclick="delReview(' + r.id + ')">删除</button>';
+    } else {
+      actions = '<span class="dim">审核处理中…</span>';
+    }
+    var reason = r.status === 'rejected' && r.audit_reason
+      ? '<div class="dim" style="color:var(--red); margin-top:4px; font-size:12px; max-width:260px;">驳回原因：' + U.esc(r.audit_reason) + '</div>' : '';
+    return '<tr><td style="max-width:260px;"><b>' + U.esc(r.title) + '</b>' + reason + '</td>'
+      + '<td><a href="game-detail.html?id=' + r.game_id + '" style="color:var(--accent-2)">' + U.esc(r.game_name) + '</a></td>'
+      + '<td>' + U.reviewBadge(r.status) + '</td>'
+      + '<td>' + (r.audit_score != null ? '<span class="score">' + r.audit_score + '</span>' : '-') + '</td>'
+      + '<td>' + (r.read_count ? U.fmtNum(r.read_count) : '-') + '</td>'
+      + '<td>' + (r.like_count ? r.like_count : '-') + '</td>'
+      + '<td>' + U.fmtDate(r.created_at) + '</td>'
+      + '<td class="actions">' + actions + '</td></tr>';
+  }).join('');
+}
+
+window.submitAudit = async function (id) {
+  if (!confirm('提交后将由 AI 自动审核，确认提交？')) return;
+  try {
+    var res = await Api.post('/reviews/' + id + '/submit-audit');
+    if (res.status === 'published') U.toast('🎉 ' + res.message, 'success');
+    else if (res.status === 'rejected') U.toast('❌ ' + res.message + '（' + res.audit.reasons.join('；') + '）', 'error');
+    else U.toast('⏳ ' + res.message, 'info');
+    loadReviews();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+window.delReview = async function (id) {
+  if (!confirm('确认删除这篇文章？删除后不可恢复。')) return;
+  try {
+    await Api.del('/reviews/' + id);
+    U.toast('已删除', 'info');
+    loadReviews();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+init();
+</script>
+</body>
+</html>

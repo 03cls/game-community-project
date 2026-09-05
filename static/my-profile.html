@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>个人中心 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="css/style.css">
+<style>#avatarBig .avatar { width: 72px; height: 72px; font-size: 28px; }</style>
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="wrap page">
+  <h2 class="section-title" style="margin-bottom:20px;">个人中心</h2>
+  <div class="grid" style="grid-template-columns: 320px 1fr; gap:20px; align-items:start;">
+
+    <!-- 左：资料与设置 -->
+    <div>
+      <div class="card" style="text-align:center; margin-bottom:16px;">
+        <div id="avatarBig" style="margin:0 auto 10px;"></div>
+        <b id="nickShow" style="font-size:16px;"></b>
+        <div style="margin-top:6px;"><span class="badge" id="roleBadge"></span></div>
+        <p class="dim" id="bioShow" style="margin-top:10px;"></p>
+      </div>
+
+      <div class="card mb-16">
+        <h3 class="section-title" style="font-size:15px;">资料编辑</h3>
+        <form onsubmit="return saveProfile(event)">
+          <div class="form-group"><label>昵称</label><input class="input" id="nickname"></div>
+          <div class="form-group"><label>头像 URL（留空使用默认首字母头像）</label><input class="input" id="avatar" placeholder="https://..."></div>
+          <div class="form-group"><label>个人简介</label><textarea class="input" id="bio" rows="3"></textarea></div>
+          <button class="btn btn-primary btn-block" type="submit">保存资料</button>
+        </form>
+      </div>
+
+      <div class="card mb-16">
+        <h3 class="section-title" style="font-size:15px;">修改密码</h3>
+        <form onsubmit="return changePassword(event)">
+          <div class="form-group"><label>原密码</label><input class="input" type="password" id="oldPwd"></div>
+          <div class="form-group"><label>新密码（至少 6 位）</label><input class="input" type="password" id="newPwd"></div>
+          <button class="btn btn-block" type="submit">更新密码</button>
+        </form>
+      </div>
+
+      <div class="card" id="applyCard">
+        <h3 class="section-title" style="font-size:15px;">📝 申请成为创作者</h3>
+        <p class="dim" style="font-size:12px; margin-bottom:10px;">通过审核后即可发布评测攻略、使用 AI 攻略创作助手。</p>
+        <div id="applyBody"></div>
+      </div>
+    </div>
+
+    <!-- 右：收藏 + 游玩档案 -->
+    <div>
+      <h3 class="section-title">⭐ 我的收藏 <a class="more" href="game-list.html">去发现更多 →</a></h3>
+      <div class="grid grid-3" id="favGrid"><div class="loading" style="grid-column:1/-1;">加载中…</div></div>
+
+      <h3 class="section-title mt-24">🎮 游玩档案</h3>
+      <div class="card table-wrap">
+        <table class="data">
+          <thead><tr><th>游戏</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+          <tbody id="recordBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="footerSlot"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/common.js"></script>
+<script>
+if (!Auth.requireLogin()) throw new Error('redirect');
+Auth.mountNav();
+document.getElementById('footerSlot').innerHTML = U.footer();
+
+var me = null;
+var PLAY_MAP = { want: '想玩', playing: '正在玩', completed: '已通关' };
+
+async function init() {
+  me = await Api.get('/users/me');
+  document.getElementById('avatarBig').innerHTML = Auth.avatarHtml(me, 72);
+  document.getElementById('nickShow').textContent = me.profile.nickname || me.username;
+  document.getElementById('roleBadge').className = 'badge ' + Auth.roleBadge[me.role];
+  document.getElementById('roleBadge').textContent = Auth.roleName[me.role];
+  document.getElementById('bioShow').textContent = me.profile.bio || '这个人很懒，什么都没写…';
+  document.getElementById('nickname').value = me.profile.nickname || '';
+  document.getElementById('avatar').value = me.profile.avatar || '';
+  document.getElementById('bio').value = me.profile.bio || '';
+  loadFavs();
+  loadRecords();
+  loadApply();
+}
+
+async function saveProfile(e) {
+  e.preventDefault();
+  try {
+    me = await Api.put('/users/me', {
+      nickname: document.getElementById('nickname').value.trim(),
+      avatar: document.getElementById('avatar').value.trim(),
+      bio: document.getElementById('bio').value.trim()
+    });
+    Api.setSession(Api.getToken(), me);
+    U.toast('资料已保存', 'success');
+    init();
+  } catch (err) { U.toast(err.message, 'error'); }
+  return false;
+}
+
+async function changePassword(e) {
+  e.preventDefault();
+  try {
+    await Api.put('/users/me/password', {
+      old_password: document.getElementById('oldPwd').value,
+      new_password: document.getElementById('newPwd').value
+    });
+    U.toast('密码修改成功', 'success');
+    document.getElementById('oldPwd').value = '';
+    document.getElementById('newPwd').value = '';
+  } catch (err) { U.toast(err.message, 'error'); }
+  return false;
+}
+
+async function loadFavs() {
+  var data = await Api.get('/favorites');
+  var box = document.getElementById('favGrid');
+  box.innerHTML = data.items.length ? data.items.map(function (g) {
+    return '<div class="card card-hover game-card" onclick="location.href=\'game-detail.html?id=' + g.id + '\'">'
+      + '<img class="cover" src="' + U.esc(g.cover_url) + '">'
+      + '<div class="body"><div class="name">' + U.esc(g.name) + '</div>'
+      + '<div class="foot"><span class="score">★ ' + g.average_score.toFixed(1) + '</span>'
+      + '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();unfav(' + g.id + ')">取消收藏</button></div>'
+      + '</div></div>';
+  }).join('') : '<div class="empty" style="grid-column:1/-1;"><div class="icon">⭐</div>还没有收藏，去游戏库逛逛吧</div>';
+}
+
+window.unfav = async function (id) {
+  await Api.del('/favorites/' + id);
+  U.toast('已取消收藏', 'info');
+  loadFavs();
+};
+
+async function loadRecords() {
+  var data = await Api.get('/play-record');
+  var body = document.getElementById('recordBody');
+  if (!data.items.length) { body.innerHTML = '<tr><td colspan="4" class="empty">暂无游玩记录，去游戏详情页标记吧</td></tr>'; return; }
+  body.innerHTML = data.items.map(function (r) {
+    return '<tr><td><a href="game-detail.html?id=' + r.game.id + '" style="color:var(--accent-2)">' + U.esc(r.game.name) + '</a></td>'
+      + '<td>' + U.playBadge(r.play_status) + '</td>'
+      + '<td>' + U.fmtDate(r.updated_at) + '</td>'
+      + '<td class="actions">' + ['want', 'playing', 'completed'].map(function (s) {
+          return '<button class="btn btn-sm ' + (r.play_status === s ? 'btn-primary' : '') + '" onclick="setRecord(' + r.game_id + ',\'' + s + '\')">' + PLAY_MAP[s] + '</button>';
+        }).join('') + '</td></tr>';
+  }).join('');
+}
+
+window.setRecord = async function (gameId, status) {
+  await Api.post('/play-record', { game_id: gameId, play_status: status });
+  U.toast('游玩状态已更新为「' + PLAY_MAP[status] + '」', 'success');
+  loadRecords();
+};
+
+async function loadApply() {
+  var body = document.getElementById('applyBody');
+  if (me.role === 'creator' || me.role === 'admin') {
+    body.innerHTML = '<div class="badge badge-green">✅ 你已拥有创作者权限</div>'
+      + (me.role === 'creator' ? '<a class="btn btn-primary btn-block mt-16" href="creator-work.html">进入创作者工作台 →</a>' : '');
+    return;
+  }
+  body.innerHTML = '<textarea class="input" id="applyReason" rows="3" placeholder="介绍你的写作经验 / 申请理由…"></textarea>'
+    + '<button class="btn btn-primary btn-block mt-16" onclick="submitApply()">提交申请</button>'
+    + '<p class="dim" id="applyStatus" style="margin-top:8px;"></p>';
+  /* 检查是否已有申请（mock：通过拉取管理员接口不可用，改为提交时后端校验；这里提示） */
+  if (U.qs('tab') === 'apply') { document.getElementById('applyCard').scrollIntoView({ behavior: 'smooth' }); }
+}
+
+window.submitApply = async function () {
+  try {
+    await Api.post('/users/apply-creator', { apply_reason: document.getElementById('applyReason').value.trim() });
+    U.toast('申请已提交，等待管理员审核', 'success');
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+init();
+</script>
+</body>
+</html>
