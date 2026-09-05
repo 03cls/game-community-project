@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>游戏详情 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 游戏详情页 <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎮 GameReview AI</span>
+    <div class="nav">
+      <a href="home.html">首页</a>
+      <a href="game-list.html" class="active">游戏库</a>
+      <a href="creator.html">创作者中心</a>
+      <a href="admin.html">管理后台</a>
+    </div>
+    <div class="search-box">🔍 搜索…</div>
+    <div class="topbar-right">
+      <div class="wf-note">登录后显示：头像 ▾（个人中心 / 创作者工作台 / 退出）</div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap section">
+  <!-- 游戏信息头 -->
+  <div class="card" style="display:flex;gap:24px;margin-bottom:20px;">
+    <div class="placeholder" style="width:260px;height:160px;flex-shrink:0;">游戏封面大图</div>
+    <div style="flex:1;">
+      <h2 style="font-size:22px;">游戏名称 <span class="score" style="font-size:18px;">★ 9.2</span></h2>
+      <p class="wf-note" style="margin:6px 0;">分类：RPG · 发行时间：2025-03-15 · 开发商（可选字段）</p>
+      <div style="margin:8px 0;"><span class="tag">开放世界</span><span class="tag">剧情</span><span class="tag">单机</span></div>
+      <p style="color:var(--text-2);margin:10px 0;">游戏简介文本……（description 字段，多行展示）</p>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <a class="btn btn-primary">☆ 收藏游戏</a>
+        <a class="btn">想玩</a><a class="btn">正在玩</a><a class="btn">已通关</a>
+      </div>
+      <p class="wf-note" style="margin-top:8px;">收藏 → POST /api/favorites；游玩状态 → POST /api/play-record（未登录 → 跳登录）</p>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px;">
+    <!-- 评测攻略列表 -->
+    <div>
+      <div class="section-title">评测 / 攻略（GET /api/games/{id}/reviews）</div>
+      <div class="card" style="margin-bottom:12px;">
+        <b>《游戏名》深度评测：年度最佳 RPG</b> <span class="badge badge-green">已发布</span>
+        <p class="wf-note">作者：玩家昵称 · 2025-09-01 · 👁 1235 · ❤ 86</p>
+        <p style="color:var(--text-2);margin:8px 0;">正文摘要前两行……点击阅读全文展开。</p>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <b>全成就通关攻略</b> <span class="badge badge-green">已发布</span>
+        <p class="wf-note">作者：攻略达人 · 👁 860 · ❤ 54</p>
+      </div>
+
+      <!-- 评论区 -->
+      <div class="wf" style="margin-top:18px;">
+        <span class="wf-label">评论区</span>
+        <div class="placeholder" style="height:60px;margin-bottom:10px;">发表评论输入框（登录后）→ POST /api/comments</div>
+        <div class="card" style="background:var(--surface-2);margin-bottom:8px;"><b>玩家A</b>：写得太好了！<span class="wf-note">· ❤ 点赞(POST /comments/{id}/like) · 回复</span></div>
+        <div class="card" style="background:var(--surface-2);margin-left:32px;"><b>玩家B 回复 玩家A</b>：+1</div>
+        <p class="wf-note">评论支持回复（parent_id）与点赞；管理员可删除违规评论</p>
+      </div>
+    </div>
+
+    <!-- 侧栏 -->
+    <div>
+      <div class="wf">
+        <span class="wf-label">AI 推荐助手</span>
+        <p class="wf-note" style="margin:8px 0;">喜欢这款游戏？AI 根据你的口味推荐类似作品</p>
+        <a class="btn btn-primary" style="width:100%;text-align:center;">🤖 获取相似推荐</a>
+      </div>
+      <div class="wf">
+        <span class="wf-label">游戏数据</span>
+        <p class="wf-note">综合评分：<span class="score">9.2</span>（评测均分）<br>收藏人数 / 游玩标记人数<br>评测攻略数：12 篇</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="proto-footer">游戏详情页原型 · 对应 /game-detail.html?id=xx · 阶段 2 产物</div>
+</body>
+</html>

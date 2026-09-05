@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>登录 / 注册 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 登录页 / 注册页 <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div style="min-height:calc(100vh - 60px);display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%, rgba(124,92,255,.15), transparent 60%);">
+  <div class="card" style="width:400px;padding:32px;">
+    <div class="logo" style="font-size:22px;text-align:center;margin-bottom:6px;">🎮 GameReview AI</div>
+    <p class="wf-note" style="text-align:center;margin-bottom:22px;">发现好游戏，分享真体验</p>
+
+    <!-- 选项卡 -->
+    <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <div style="flex:1;text-align:center;padding:10px;background:linear-gradient(90deg,var(--accent),var(--accent-2));font-weight:600;">登录</div>
+      <div style="flex:1;text-align:center;padding:10px;color:var(--text-2);">注册</div>
+    </div>
+
+    <div class="wf" style="margin-bottom:12px;">
+      <span class="wf-label">账号</span>
+      <div class="placeholder" style="height:36px;margin-top:6px;">用户名 或 邮箱</div>
+    </div>
+    <div class="wf" style="margin-bottom:12px;">
+      <span class="wf-label">密码</span>
+      <div class="placeholder" style="height:36px;margin-top:6px;">密码输入框（密文）</div>
+    </div>
+
+    <a class="btn btn-primary" style="width:100%;text-align:center;margin-top:6px;">登 录</a>
+    <p class="wf-note" style="text-align:center;margin-top:14px;">
+      POST /api/auth/login → 返回 access_token 存 localStorage<br>
+      401 时清除 token 跳回本页
+    </p>
+
+    <div style="border-top:1px dashed var(--border);margin:18px 0 12px;"></div>
+    <p class="wf-note" style="text-align:center;">注册表单字段：用户名 / 邮箱 / 密码 / 确认密码<br>POST /api/auth/register（注册成功不返回 token，跳转登录）</p>
+
+    <div class="wf" style="margin-top:16px;">
+      <span class="wf-label">测试账号（种子数据）</span>
+      <p class="wf-note" style="margin-top:6px;">
+        管理员 admin / admin123<br>
+        创作者 creator / creator123<br>
+        玩家 player / player123</p>
+    </div>
+  </div>
+</div>
+<div class="proto-footer">登录/注册页原型 · 对应 /login.html · /register.html · 阶段 2 产物</div>
+</body>
+</html>

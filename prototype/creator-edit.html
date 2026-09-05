@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>评测编辑 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 评测编辑页（富文本 + AI 创作助手） <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎮 GameReview AI</span>
+    <div class="nav">
+      <a href="home.html">首页</a>
+      <a href="game-list.html">游戏库</a>
+      <a href="creator.html" class="active">创作者中心</a>
+    </div>
+    <div class="topbar-right" style="flex:1;justify-content:flex-end;gap:8px;">
+      <a class="btn">保存草稿</a>
+      <a class="btn btn-primary">提交审核（触发 AI 审核）</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap section">
+  <div class="grid" style="grid-template-columns: 1fr 340px; gap:20px;">
+
+    <!-- 编辑器区 -->
+    <div>
+      <div class="wf" style="margin-bottom:14px;">
+        <span class="wf-label">文章设置</span>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <div class="placeholder" style="flex:1;height:36px;">标题输入框</div>
+          <div class="placeholder" style="width:200px;height:36px;">关联游戏（下拉选择）</div>
+        </div>
+        <div style="margin-top:10px;"><span class="tag">＋ 标签</span><span class="tag">RPG</span><span class="tag">剧情</span></div>
+      </div>
+
+      <div class="wf" style="min-height:420px;">
+        <span class="wf-label">轻量富文本编辑器</span>
+        <div style="display:flex;gap:8px;border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:12px;">
+          <span class="btn btn-sm">B</span><span class="btn btn-sm"><i>I</i></span><span class="btn btn-sm">H2</span>
+          <span class="btn btn-sm">• 列表</span><span class="btn btn-sm">🔗 链接</span><span class="btn btn-sm">🖼 图片</span>
+        </div>
+        <div class="placeholder" style="height:300px;align-items:flex-start;justify-content:flex-start;padding:14px;text-align:left;">
+          正文编辑区（content，HTML 富文本）<br><br>
+          · 支持草稿保存（status=draft）<br>
+          · 提交后进入 AI 内容审核（辱骂引战 / 广告引流 / 违规内容）<br>
+          · 服务端 bleach 白名单清洗 XSS<br>
+          · AI 助手生成内容可一键复制到光标位置
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 助手面板 -->
+    <div>
+      <div class="wf" style="position:sticky;top:80px;">
+        <span class="wf-label">🤖 AI 攻略创作助手</span>
+        <p class="wf-note" style="margin:10px 0;">上下文：关联游戏 + 已写正文片段；POST /api/ai/creator-assistant</p>
+
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+          <span class="tag" style="border-color:var(--accent);color:var(--text);">生成评测大纲</span>
+          <span class="tag">通关思路</span>
+          <span class="tag">润色文案</span>
+          <span class="tag">分析优缺点</span>
+        </div>
+
+        <div class="card" style="background:var(--surface-2);margin-bottom:8px;">
+          <b style="color:var(--accent-2);">AI：</b>
+          <p class="wf-note">以下是《XXX》评测大纲建议：<br>1. 画面与音效表现<br>2. 战斗系统深度<br>3. 剧情叙事<br>4. 优缺点总结…</p>
+          <a class="btn btn-sm btn-primary" style="margin-top:6px;">📋 复制到编辑器</a>
+        </div>
+        <div class="card" style="background:var(--surface-2);margin-bottom:12px;text-align:right;">
+          <b>我：</b><span class="wf-note">帮我润色第二段</span>
+        </div>
+
+        <div class="placeholder" style="height:56px;">输入消息…（回车发送）</div>
+        <p class="wf-note" style="margin-top:8px;">AI 接口允许 3-8 秒响应；未配置 DeepSeek Key 时返回 Mock 示例</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="proto-footer">评测编辑页原型 · 对应 /creator-edit.html?id=xx · 阶段 2 产物</div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>游戏库 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 游戏库列表页 <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎮 GameReview AI</span>
+    <div class="nav">
+      <a href="home.html">首页</a>
+      <a href="game-list.html" class="active">游戏库</a>
+      <a href="creator.html">创作者中心</a>
+      <a href="admin.html">管理后台</a>
+    </div>
+    <div class="search-box">🔍 搜索游戏名称 / 标签…</div>
+    <div class="topbar-right"><a class="btn btn-primary btn-sm" href="login.html">登录</a></div>
+  </div>
+</div>
+
+<div class="wrap section">
+  <div class="grid" style="grid-template-columns: 220px 1fr; gap:20px;">
+
+    <!-- 筛选侧栏 -->
+    <div>
+      <div class="wf" style="position:sticky;top:80px;">
+        <span class="wf-label">筛选面板</span>
+        <p style="margin:8px 0 4px;font-weight:600;">游戏分类</p>
+        <div><span class="tag" style="border-color:var(--accent);color:var(--text)">全部</span><span class="tag">RPG</span><span class="tag">射击</span><span class="tag">开放世界</span><span class="tag">动作</span><span class="tag">模拟</span><span class="tag">策略</span></div>
+        <p style="margin:14px 0 4px;font-weight:600;">排序方式</p>
+        <div class="wf-note">● 综合热度 &nbsp; ○ 发布时间 &nbsp; ○ 评分最高</div>
+        <p style="margin:14px 0 4px;font-weight:600;">关键字搜索</p>
+        <div class="placeholder" style="height:32px;">输入名称/标签 → GET /api/games?keyword=</div>
+      </div>
+    </div>
+
+    <!-- 游戏网格 -->
+    <div>
+      <div class="wf-note" style="margin-bottom:10px;">共 128 款游戏 · 第 1/13 页（分页：page / page_size）</div>
+      <div class="grid grid-3">
+        <!-- 重复卡片 ×9 -->
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名称</b><br><span class="tag">RPG</span><span class="tag">开放世界</span><div style="margin-top:6px;"><span class="score">★ 9.2</span> <span class="wf-note">· 2025-03</span></div></div>
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名称</b><br><span class="tag">射击</span><div style="margin-top:6px;"><span class="score">★ 8.7</span></div></div>
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名称</b><br><span class="tag">动作</span><div style="margin-top:6px;"><span class="score">★ 8.5</span></div></div>
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名称</b><br><span class="tag">模拟</span><div style="margin-top:6px;"><span class="score">★ 9.0</span></div></div>
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名称</b><br><span class="tag">策略</span><div style="margin-top:6px;"><span class="score">★ 7.9</span></div></div>
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名称</b><br><span class="tag">RPG</span><div style="margin-top:6px;"><span class="score">★ 8.8</span></div></div>
+      </div>
+      <div class="wf" style="margin-top:16px;text-align:center;">
+        <span class="wf-label">分页器</span>
+        ‹ 1 2 3 … 13 › &nbsp; <span class="wf-note">GET /api/games?page=&page_size=&category=&sort=</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="proto-footer">游戏库列表页原型 · 对应 /game-list.html · 阶段 2 产物</div>
+</body>
+</html>

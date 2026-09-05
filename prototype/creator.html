@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>创作者工作台 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 创作者工作台 <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎮 GameReview AI</span>
+    <div class="nav">
+      <a href="home.html">首页</a>
+      <a href="game-list.html">游戏库</a>
+      <a href="creator.html" class="active">创作者中心</a>
+      <a href="admin.html">管理后台</a>
+    </div>
+    <div class="topbar-right" style="flex:1;justify-content:flex-end;">
+      <span class="badge badge-green">创作者 creator</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap section">
+  <div style="display:flex;align-items:center;margin-bottom:18px;">
+    <h2>创作者工作台</h2>
+    <a class="btn btn-primary" style="margin-left:auto;" href="creator-edit.html">＋ 新建评测 / 攻略</a>
+  </div>
+
+  <!-- 数据统计 -->
+  <div class="grid grid-4" style="margin-bottom:24px;">
+    <div class="card" style="text-align:center;"><div style="font-size:28px;font-weight:700;color:var(--accent-2);">12</div><span class="wf-note">已发布文章</span></div>
+    <div class="card" style="text-align:center;"><div style="font-size:28px;font-weight:700;color:var(--gold);">8.6k</div><span class="wf-note">总阅读量</span></div>
+    <div class="card" style="text-align:center;"><div style="font-size:28px;font-weight:700;color:var(--green);">432</div><span class="wf-note">总点赞数</span></div>
+    <div class="card" style="text-align:center;"><div style="font-size:28px;font-weight:700;color:var(--accent);">156</div><span class="wf-note">总收藏数</span></div>
+  </div>
+  <p class="wf-note" style="margin:-16px 0 20px;">GET /api/creator/statistics（阅读量 read_count / 点赞 like_count / 收藏数 聚合）</p>
+
+  <!-- 我的文章列表 -->
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>标题</th><th>关联游戏</th><th>状态</th><th>阅读</th><th>点赞</th><th>创建时间</th><th>操作</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>《XXX》深度评测</td><td class="wf-note">游戏 A</td>
+          <td><span class="badge badge-green">已发布</span></td>
+          <td>1235</td><td>86</td><td class="wf-note">2025-09-01</td>
+          <td><a class="btn btn-sm">编辑</a> <a class="btn btn-sm btn-danger">删除</a></td>
+        </tr>
+        <tr>
+          <td>全成就通关指南（草稿）</td><td class="wf-note">游戏 B</td>
+          <td><span class="badge badge-amber">草稿</span></td>
+          <td>—</td><td>—</td><td class="wf-note">2025-09-03</td>
+          <td><a class="btn btn-sm" href="creator-edit.html">编辑</a> <a class="btn btn-sm btn-primary">提交审核</a></td>
+        </tr>
+        <tr>
+          <td>新手避坑攻略</td><td class="wf-note">游戏 C</td>
+          <td><span class="badge badge-amber">审核中</span></td>
+          <td>—</td><td>—</td><td class="wf-note">2025-09-04</td>
+          <td class="wf-note">AI 审核中…</td>
+        </tr>
+        <tr>
+          <td>玩法心得</td><td class="wf-note">游戏 A</td>
+          <td><span class="badge badge-red">AI 驳回</span></td>
+          <td>—</td><td>—</td><td class="wf-note">2025-08-30</td>
+          <td><a class="btn btn-sm">查看原因/修改</a></td>
+        </tr>
+        <tr>
+          <td>剧情解析</td><td class="wf-note">游戏 D</td>
+          <td><span class="badge badge-blue">人工复核中</span></td>
+          <td>—</td><td>—</td><td class="wf-note">2025-08-28</td>
+          <td class="wf-note">等待管理员复核</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="wf-note" style="margin-top:10px;">
+      状态机：draft（草稿）→ audit（提交审核，触发 AI 审核）→ published（AI 通过/人工通过）/ rejected（AI 驳回，附 audit_reason）<br>
+      接口：POST /api/reviews · PUT /api/reviews/{id} · DELETE /api/reviews/{id} · POST /api/reviews/{id}/submit-audit
+    </p>
+  </div>
+</div>
+<div class="proto-footer">创作者工作台原型 · 对应 /creator-work.html · 阶段 2 产物</div>
+</body>
+</html>

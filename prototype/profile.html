@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>个人中心 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 个人中心 <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎮 GameReview AI</span>
+    <div class="nav">
+      <a href="home.html">首页</a>
+      <a href="game-list.html">游戏库</a>
+      <a href="creator.html">创作者中心</a>
+      <a href="admin.html">管理后台</a>
+    </div>
+    <div class="topbar-right" style="flex:1;justify-content:flex-end;">
+      <span class="badge badge-blue">玩家 player</span>
+      <div class="placeholder" style="width:34px;height:34px;border-radius:50%;">头像</div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap section">
+  <h2 style="margin-bottom:18px;">个人中心</h2>
+
+  <div class="grid" style="grid-template-columns: 300px 1fr; gap:20px;">
+    <!-- 左侧：资料 -->
+    <div>
+      <div class="card" style="text-align:center;margin-bottom:16px;">
+        <div class="placeholder" style="width:80px;height:80px;border-radius:50%;margin:0 auto 10px;">头像</div>
+        <b>玩家昵称</b><br>
+        <span class="badge badge-blue">角色：player</span>
+        <p class="wf-note" style="margin-top:8px;">个人简介：这个人很懒，什么都没写…</p>
+      </div>
+
+      <div class="wf">
+        <span class="wf-label">资料编辑</span>
+        <div class="placeholder" style="height:32px;margin:8px 0;">昵称</div>
+        <div class="placeholder" style="height:32px;margin:8px 0;">头像 URL（静态图片模拟）</div>
+        <div class="placeholder" style="height:60px;margin:8px 0;">个人简介 bio</div>
+        <a class="btn btn-primary btn-sm" style="width:100%;text-align:center;">保存资料</a>
+        <p class="wf-note" style="margin-top:6px;">PUT /api/users/me</p>
+      </div>
+
+      <div class="wf">
+        <span class="wf-label">修改密码</span>
+        <div class="placeholder" style="height:32px;margin:8px 0;">旧密码 / 新密码</div>
+        <a class="btn btn-sm" style="width:100%;text-align:center;">更新密码</a>
+        <p class="wf-note" style="margin-top:6px;">PUT /api/users/me/password（bcrypt 校验）</p>
+      </div>
+
+      <div class="wf">
+        <span class="wf-label">创作者申请</span>
+        <p class="wf-note" style="margin:8px 0;">玩家可提交申请成为评测创作者，管理员审核后开通</p>
+        <div class="placeholder" style="height:60px;margin:8px 0;">申请理由 apply_reason</div>
+        <a class="btn btn-primary btn-sm" style="width:100%;text-align:center;">提交申请</a>
+        <p class="wf-note" style="margin-top:6px;">POST /api/users/apply-creator</p>
+      </div>
+    </div>
+
+    <!-- 右侧：收藏 + 游玩记录 -->
+    <div>
+      <div class="section-title">我的收藏（GET /api/favorites）</div>
+      <div class="grid grid-3" style="margin-bottom:24px;">
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名</b><br><span class="wf-note">★ 9.2 · <span style="color:var(--red)">取消收藏</span></span></div>
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名</b><br><span class="wf-note">★ 8.7</span></div>
+        <div class="card"><div class="placeholder game-cover">封面</div><b>游戏名</b><br><span class="wf-note">★ 8.5</span></div>
+      </div>
+
+      <div class="section-title">游玩档案（GET /api/play-record）</div>
+      <div class="card">
+        <table>
+          <thead><tr><th>游戏</th><th>状态</th><th>标记时间</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>游戏 A</td><td><span class="badge badge-blue">想玩</span></td><td class="wf-note">2025-09-01</td><td class="wf-note">切换状态</td></tr>
+            <tr><td>游戏 B</td><td><span class="badge badge-amber">正在玩</span></td><td class="wf-note">2025-08-20</td><td class="wf-note">切换状态</td></tr>
+            <tr><td>游戏 C</td><td><span class="badge badge-green">已通关</span></td><td class="wf-note">2025-07-15</td><td class="wf-note">切换状态</td></tr>
+          </tbody>
+        </table>
+        <p class="wf-note" style="margin-top:8px;">play_status：want / playing / completed → POST /api/play-record</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="proto-footer">个人中心原型 · 对应 /my-profile.html · 阶段 2 产物</div>
+</body>
+</html>

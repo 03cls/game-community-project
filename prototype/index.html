@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>UI 原型索引 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">阶段 2 产物 · UI 原型（线框图）· 点击任意页面可跳转预览 · <a href="../PRD.md" style="color:#7c9cff">PRD.md</a></div>
+
+<div class="wrap section">
+  <h1 style="font-size:26px;margin-bottom:6px;">AI 游戏社区评测分享平台</h1>
+  <p class="wf-note" style="margin-bottom:24px;">PC 端 Web · 仅适配桌面浏览器 · 暗色游戏主题 · 三类角色：玩家 / 创作者 / 管理员</p>
+
+  <div class="section-title">设计规范（Design Tokens）</div>
+  <div class="card" style="margin-bottom:28px;">
+    <div class="swallow" style="margin-bottom:14px;">
+      <div class="swatch">
+        <div><span style="background:#0e1016"></span>背景 #0e1016</div>
+        <div><span style="background:#181b26"></span>卡片 #181b26</div>
+        <div><span style="background:linear-gradient(90deg,#7c5cff,#4f8cff)"></span>主色渐变</div>
+        <div><span style="background:#ffb020"></span>评分金 #ffb020</div>
+        <div><span style="background:#34d399"></span>通过绿</div>
+        <div><span style="background:#fbbf24"></span>待审黄</div>
+        <div><span style="background:#f87171"></span>驳回红</div>
+      </div>
+    </div>
+    <p class="wf-note">布局：顶部导航 60px + 内容区最大宽度 1200px 居中；卡片圆角 12px；状态用彩色徽标（绿=通过/已发布，黄=审核中/草稿，红=驳回/封禁，蓝=AI/人工复核中）。</p>
+  </div>
+
+  <div class="section-title">页面站点地图（12 个页面）</div>
+  <div class="grid grid-2 sitemap">
+    <a href="home.html"><b>① 首页</b> <span class="path">/index.html</span><br><span class="wf-note">Hero 推荐位、热门游戏、最新评测、AI 推荐入口</span></a>
+    <a href="login.html"><b>② 登录页 / ③ 注册页</b> <span class="path">/login.html · /register.html</span><br><span class="wf-note">账号密码 / 用户名邮箱登录，注册后不自动登录</span></a>
+    <a href="game-list.html"><b>④ 游戏库列表页</b> <span class="path">/game-list.html</span><br><span class="wf-note">分类/热度/时间筛选、关键字搜索、分页卡片</span></a>
+    <a href="game-detail.html"><b>⑤ 游戏详情页</b> <span class="path">/game-detail.html?id=xx</span><br><span class="wf-note">封面信息、评分、收藏/游玩标记、评测列表、评论</span></a>
+    <a href="profile.html"><b>⑥ 个人中心</b> <span class="path">/my-profile.html</span><br><span class="wf-note">资料修改、改密、我的收藏、游玩档案、创作者申请</span></a>
+    <a href="creator.html"><b>⑦ 创作者工作台</b> <span class="path">/creator-work.html</span><br><span class="wf-note">文章列表、草稿管理、审核状态、作品数据统计</span></a>
+    <a href="creator-edit.html"><b>⑧ 评测编辑页</b> <span class="path">/creator-edit.html?id=xx</span><br><span class="wf-note">富文本编辑器 + AI 创作助手对话框（大纲/润色/思路）</span></a>
+    <a href="admin.html"><b>⑨-⑫ 管理员后台（4 页合一预览）</b> <span class="path">/admin/*.html</span><br><span class="wf-note">仪表盘 / 用户管理 / 审核队列 / 游戏与分类管理</span></a>
+  </div>
+
+  <div class="section-title" style="margin-top:28px;">核心交互流</div>
+  <div class="card wf-note">
+    ① 浏览流：首页 → 游戏库筛选/搜索 → 游戏详情 → 阅读评测 → 评论/点赞（未登录点收藏/评论 → 跳登录）<br>
+    ② 创作流：个人中心申请创作者 → 管理员审核通过 → 工作台新建评测 → AI 助手辅助写作 → 保存草稿/提交审核 → <b>AI 自动审核</b>（通过→发布 / 驳回→退回作者 / 存疑→人工复核）<br>
+    ③ 管理流：管理员仪表盘 → 处理创作者申请 → 审核队列人工决策 → 游戏库/分类/评论维护 → 查看 AI 审核日志
+  </div>
+</div>
+
+<div class="proto-footer">AI 游戏社区评测分享平台 · UI Prototype · 阶段 2 产物</div>
+</body>
+</html>

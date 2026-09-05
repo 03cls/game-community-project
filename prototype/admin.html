@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>管理后台 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 管理员后台（4 个页面合一预览） <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎮 GameReview AI</span>
+    <div class="nav">
+      <a href="home.html">前台首页</a>
+      <a href="admin.html" class="active">管理后台</a>
+    </div>
+    <div class="topbar-right" style="flex:1;justify-content:flex-end;">
+      <span class="badge badge-red">管理员 admin</span>
+    </div>
+  </div>
+</div>
+
+<div class="admin-layout">
+  <!-- 侧边菜单 -->
+  <div class="admin-side">
+    <b class="wf-note" style="display:block;padding:0 14px 10px;">后台管理</b>
+    <a href="#dashboard" class="active">📊 数据仪表盘</a>
+    <a href="#users">👥 用户管理</a>
+    <a href="#apply">📝 创作者申请</a>
+    <a href="#audit">⚖️ 审核队列</a>
+    <a href="#games">🎮 游戏 & 分类管理</a>
+    <a href="#logs">🤖 AI 审核日志</a>
+    <a href="#comments">💬 评论管理</a>
+  </div>
+
+  <div class="admin-main">
+
+    <!-- 仪表盘 -->
+    <div id="dashboard" class="wf">
+      <span class="wf-label">① 控制台仪表盘 /admin/index.html</span>
+      <div class="grid grid-4" style="margin-top:10px;">
+        <div class="card" style="text-align:center;"><div style="font-size:26px;font-weight:700;color:var(--accent-2);">2,318</div><span class="wf-note">总用户数</span></div>
+        <div class="card" style="text-align:center;"><div style="font-size:26px;font-weight:700;color:var(--green);">128</div><span class="wf-note">游戏总数</span></div>
+        <div class="card" style="text-align:center;"><div style="font-size:26px;font-weight:700;color:var(--gold);">564</div><span class="wf-note">评测攻略总数</span></div>
+        <div class="card" style="text-align:center;"><div style="font-size:26px;font-weight:700;color:var(--red);">7</div><span class="wf-note">待审核内容</span></div>
+      </div>
+    </div>
+
+    <!-- 用户管理 -->
+    <div id="users" class="wf">
+      <span class="wf-label">② 用户管理 /admin/user.html</span>
+      <div class="card" style="margin-top:10px;background:var(--surface-2);">
+        <table>
+          <thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>1024</td><td>player01</td><td class="wf-note">p@xx.com</td><td><span class="badge badge-blue">玩家</span></td><td><span class="badge badge-green">正常</span></td><td class="wf-note">2025-08-01</td><td><a class="btn btn-sm">授予创作者</a> <a class="btn btn-sm btn-danger">封禁</a> <a class="btn btn-sm">重置密码</a></td></tr>
+            <tr><td>1025</td><td>bad_user</td><td class="wf-note">b@xx.com</td><td><span class="badge badge-blue">玩家</span></td><td><span class="badge badge-red">已封禁</span></td><td class="wf-note">2025-08-02</td><td><a class="btn btn-sm">解封</a></td></tr>
+            <tr><td>1026</td><td>writer</td><td class="wf-note">w@xx.com</td><td><span class="badge badge-green">创作者</span></td><td><span class="badge badge-green">正常</span></td><td class="wf-note">2025-07-20</td><td><a class="btn btn-sm btn-danger">撤销创作者</a></td></tr>
+          </tbody>
+        </table>
+        <p class="wf-note" style="margin-top:8px;">GET /api/admin/users · PUT /api/admin/users/{id}/status · PUT /api/admin/users/{id}/role</p>
+      </div>
+    </div>
+
+    <!-- 创作者申请 -->
+    <div id="apply" class="wf">
+      <span class="wf-label">③ 创作者申请处理</span>
+      <div class="card" style="margin-top:10px;background:var(--surface-2);">
+        <table>
+          <thead><tr><th>申请人</th><th>申请理由</th><th>提交时间</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>player02</td><td class="wf-note">我有 3 年游戏媒体撰稿经验…</td><td class="wf-note">2025-09-04</td><td><a class="btn btn-sm btn-primary">同意</a> <a class="btn btn-sm btn-danger">驳回</a></td></tr>
+          </tbody>
+        </table>
+        <p class="wf-note" style="margin-top:8px;">GET /api/admin/creator-apply · PUT /api/admin/creator-apply/{id}/deal（同意后用户角色升级为 creator）</p>
+      </div>
+    </div>
+
+    <!-- 审核队列 -->
+    <div id="audit" class="wf">
+      <span class="wf-label">④ 审核队列 /admin/audit-queue.html</span>
+      <div class="card" style="margin-top:10px;background:var(--surface-2);">
+        <table>
+          <thead><tr><th>标题</th><th>作者</th><th>AI 风险分</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>新游评测一篇</td><td class="wf-note">creator03</td><td><span class="score">62</span></td><td><span class="badge badge-blue">人工复核中</span></td><td><a class="btn btn-sm btn-primary">通过</a> <a class="btn btn-sm btn-danger">驳回</a></td></tr>
+            <tr><td>通关攻略</td><td class="wf-note">creator01</td><td><span class="score">35</span></td><td><span class="badge badge-amber">审核中</span></td><td class="wf-note">AI 处理中</td></tr>
+          </tbody>
+        </table>
+        <p class="wf-note" style="margin-top:8px;">
+          GET /api/admin/reviews/pending · POST /api/admin/reviews/{id}/audit-decision（人工通过/驳回 + 处理理由）<br>
+          AI 流转：passed+低分 → 自动发布；rejected+高分 → AI 驳回退回作者；manual_review → 进入本队列
+        </p>
+      </div>
+    </div>
+
+    <!-- 游戏 & 分类管理 -->
+    <div id="games" class="wf">
+      <span class="wf-label">⑤ 游戏 & 分类管理 /admin/game-manage.html</span>
+      <div class="grid grid-2" style="margin-top:10px;">
+        <div class="card" style="background:var(--surface-2);">
+          <b>游戏条目</b>
+          <p class="wf-note" style="margin:8px 0;">新增 / 编辑 / 下架游戏：名称、封面 URL、简介、发行时间、分类、标签</p>
+          <table>
+            <thead><tr><th>游戏</th><th>分类</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td>游戏 A</td><td class="wf-note">RPG</td><td><span class="badge badge-green">上架</span></td><td><a class="btn btn-sm">编辑</a> <a class="btn btn-sm btn-danger">下架</a></td></tr>
+            </tbody>
+          </table>
+          <p class="wf-note" style="margin-top:6px;">POST/PUT /api/admin/games</p>
+        </div>
+        <div class="card" style="background:var(--surface-2);">
+          <b>游戏分类</b>
+          <p class="wf-note" style="margin:8px 0;">RPG / 射击 / 开放世界 / 模拟 / 策略 / 动作…</p>
+          <div class="placeholder" style="height:36px;margin-bottom:8px;">新增分类名</div>
+          <table>
+            <thead><tr><th>分类名</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td>RPG</td><td><a class="btn btn-sm">改名</a> <a class="btn btn-sm btn-danger">删除</a></td></tr>
+              <tr><td>射击</td><td><a class="btn btn-sm">改名</a> <a class="btn btn-sm btn-danger">删除</a></td></tr>
+            </tbody>
+          </table>
+          <p class="wf-note" style="margin-top:6px;">POST/PUT/DELETE /api/admin/categories</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 日志 + 评论管理 -->
+    <div id="logs" class="wf">
+      <span class="wf-label">⑥ AI 审核日志 + ⑦ 评论管理</span>
+      <div class="card" style="margin-top:10px;background:var(--surface-2);">
+        <table>
+          <thead><tr><th>文章</th><th>审核类型</th><th>风险分</th><th>命中原因 / 违规片段</th><th>操作人</th><th>时间</th></tr></thead>
+          <tbody>
+            <tr><td class="wf-note">评测#88</td><td><span class="badge badge-blue">AI</span></td><td><span class="score">85</span></td><td class="wf-note">命中广告引流："加群 xxx"</td><td>system</td><td class="wf-note">09-04</td></tr>
+            <tr><td class="wf-note">评测#91</td><td><span class="badge badge-amber">人工</span></td><td>—</td><td class="wf-note">复核通过：内容正常</td><td>admin</td><td class="wf-note">09-05</td></tr>
+          </tbody>
+        </table>
+        <p class="wf-note" style="margin-top:8px;">GET /api/admin/audit/logs（audit_logs 表）· 评论：DELETE /api/admin/comments/{id}</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+<div class="proto-footer">管理后台原型 · 对应 /admin/index.html · user.html · audit-queue.html · game-manage.html · 阶段 2 产物</div>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>首页 — 原型</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="proto-banner">UI 原型 · 首页 <a href="index.html" style="color:#7c9cff">← 返回原型索引</a></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎮 GameReview AI</span>
+    <div class="nav">
+      <a href="home.html" class="active">首页</a>
+      <a href="game-list.html">游戏库</a>
+      <a href="creator.html">创作者中心</a>
+      <a href="admin.html">管理后台</a>
+    </div>
+    <div class="search-box">🔍 搜索游戏名称 / 标签…</div>
+    <div class="topbar-right">
+      <a class="btn btn-primary btn-sm" href="login.html">登录 / 注册</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- Hero + AI 推荐 -->
+  <div class="section">
+    <div class="grid grid-2" style="grid-template-columns: 2fr 1fr;">
+      <div class="wf" style="height:280px;display:flex;flex-direction:column;justify-content:flex-end;">
+        <span class="wf-label">Banner 推荐位</span>
+        <div style="font-size:22px;font-weight:700;">热门大作轮播图（封面 + 游戏名 + 评分）</div>
+        <p class="wf-note">自动轮播 3-5 个热门游戏，点击进入详情页</p>
+      </div>
+      <div class="wf" style="height:280px;">
+        <span class="wf-label">AI 游戏推荐助手</span>
+        <div class="placeholder" style="height:120px;margin:10px 0;">🤖 登录后基于你的收藏 / 游玩记录<br>个性化推荐，附推荐理由</div>
+        <a class="btn btn-primary" style="width:100%;text-align:center;">获取 AI 推荐</a>
+        <p class="wf-note" style="margin-top:8px;">未登录点击 → 跳转登录页；输出卡片列表 [{game, reason}]</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 热门游戏 -->
+  <div class="section">
+    <div class="section-title">热门游戏 <a href="game-list.html" style="margin-left:auto;font-size:12px;color:var(--accent-2)">查看全部 →</a></div>
+    <div class="grid grid-4">
+      <div class="card"><div class="placeholder game-cover">游戏封面 280×150</div><b>游戏名称</b><br><span class="tag">RPG</span><span class="tag">开放世界</span><br><span class="score">★ 9.2</span></div>
+      <div class="card"><div class="placeholder game-cover">游戏封面</div><b>游戏名称</b><br><span class="tag">射击</span><span class="tag">联机</span><br><span class="score">★ 8.7</span></div>
+      <div class="card"><div class="placeholder game-cover">游戏封面</div><b>游戏名称</b><br><span class="tag">动作</span><br><span class="score">★ 8.5</span></div>
+      <div class="card"><div class="placeholder game-cover">游戏封面</div><b>游戏名称</b><br><span class="tag">模拟</span><br><span class="score">★ 9.0</span></div>
+    </div>
+  </div>
+
+  <!-- 最新评测 -->
+  <div class="section">
+    <div class="section-title">最新评测攻略</div>
+    <div class="grid grid-2">
+      <div class="card" style="display:flex;gap:14px;">
+        <div class="placeholder" style="width:120px;height:80px;flex-shrink:0;">封面</div>
+        <div><b>评测标题：《XXX》深度评测</b><br><span class="wf-note">作者昵称 · 关联游戏 · 阅读 1.2k · 点赞 86</span><br><span class="badge badge-green">已发布</span></div>
+      </div>
+      <div class="card" style="display:flex;gap:14px;">
+        <div class="placeholder" style="width:120px;height:80px;flex-shrink:0;">封面</div>
+        <div><b>攻略标题：全成就通关指南</b><br><span class="wf-note">作者昵称 · 关联游戏 · 阅读 860 · 点赞 54</span><br><span class="badge badge-green">已发布</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="proto-footer">首页原型 · 对应 /index.html · 阶段 2 产物</div>
+</body>
+</html>
