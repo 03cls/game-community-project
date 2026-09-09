@@ -1,8 +1,9 @@
 /* ============================================================
-   api.js — 请求层（阶段3 产物）
+   api.js — 请求层（阶段3 产物 + 多账号支持）
    - 自动探测后端：/api/health 可达 → 真实 FastAPI；否则 → Mock
    - 自动携带 JWT（Authorization: Bearer）
-   - 401 统一处理：清除 token 跳转登录页
+   - 401 统一处理：移除失效账号，有其他账号则自动切换，否则跳转登录页
+   - 多账号：gc_accounts 存储已登录账号列表，gc_token/gc_user 为当前活跃账号
    ============================================================ */
 
 (function () {
@@ -10,21 +11,79 @@
 
   var TOKEN_KEY = 'gc_token';
   var USER_KEY = 'gc_user';
+  var ACCOUNTS_KEY = 'gc_accounts'; /* [{token, user}] */
   var mode = 'unknown'; // 'real' | 'mock'
 
+  /* ===== 多账号存储 ===== */
+  function getAccounts() {
+    try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveAccounts(list) {
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+  }
+
   function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
-  function setSession(token, user) {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  }
-  function clearSession() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-  }
   function getUser() {
     try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); }
     catch (e) { return null; }
   }
+
+  /* 设置当前会话，同时写入账号列表（去重：同 user.id 覆盖） */
+  function setSession(token, user) {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    var accounts = getAccounts();
+    var idx = -1;
+    for (var i = 0; i < accounts.length; i++) {
+      if (accounts[i].user && user && accounts[i].user.id === user.id) { idx = i; break; }
+    }
+    if (idx >= 0) { accounts[idx].token = token; accounts[idx].user = user; }
+    else { accounts.push({ token: token, user: user }); }
+    saveAccounts(accounts);
+  }
+
+  /* 退出当前账号：从列表移除；有其他账号则自动切换到第一个 */
+  function clearSession() {
+    var token = getToken();
+    var accounts = getAccounts().filter(function (a) { return a.token !== token; });
+    saveAccounts(accounts);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    if (accounts.length > 0) {
+      localStorage.setItem(TOKEN_KEY, accounts[0].token);
+      localStorage.setItem(USER_KEY, JSON.stringify(accounts[0].user));
+    }
+  }
+
+  /* 切换到指定索引的账号 */
+  function switchAccount(index) {
+    var accounts = getAccounts();
+    if (index < 0 || index >= accounts.length) return false;
+    var a = accounts[index];
+    localStorage.setItem(TOKEN_KEY, a.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(a.user));
+    return true;
+  }
+
+  /* 移除指定索引的账号（不退出当前登录，仅从列表删除） */
+  function removeAccount(index) {
+    var accounts = getAccounts();
+    if (index < 0 || index >= accounts.length) return;
+    var removed = accounts.splice(index, 1)[0];
+    saveAccounts(accounts);
+    /* 如果删的是当前活跃账号，切到第一个 */
+    if (removed.token === getToken()) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      if (accounts.length > 0) {
+        localStorage.setItem(TOKEN_KEY, accounts[0].token);
+        localStorage.setItem(USER_KEY, JSON.stringify(accounts[0].user));
+      }
+    }
+  }
+
+  function listAccounts() { return getAccounts(); }
 
   /* 探测后端是否在线（1.5s 超时） */
   function detectBackend() {
@@ -74,8 +133,20 @@
     return data;
   }
 
+  /* 401 处理：移除失效账号，有其他账号则自动切换并刷新，否则跳登录页 */
   function handle401() {
-    clearSession();
+    var token = getToken();
+    var accounts = getAccounts().filter(function (a) { return a.token !== token; });
+    saveAccounts(accounts);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    if (accounts.length > 0) {
+      /* 切到另一个账号，刷新当前页 */
+      localStorage.setItem(TOKEN_KEY, accounts[0].token);
+      localStorage.setItem(USER_KEY, JSON.stringify(accounts[0].user));
+      location.reload();
+      return;
+    }
     if (!/login\.html/.test(location.pathname)) {
       var inAdmin = /\/admin\//.test(location.pathname);
       var prefix = inAdmin ? '../' : '';
@@ -96,6 +167,9 @@
     getToken: getToken,
     setSession: setSession,
     clearSession: clearSession,
-    getUser: getUser
+    getUser: getUser,
+    listAccounts: listAccounts,
+    switchAccount: switchAccount,
+    removeAccount: removeAccount
   };
 })();

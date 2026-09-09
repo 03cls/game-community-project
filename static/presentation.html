@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GameReview AI — 项目介绍</title>
+<link rel="stylesheet" href="css/style.css?v=pp2">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0B0E14; font-family:"Noto Sans SC","PingFang SC",system-ui,sans-serif; color:#E9EDF4; overflow:hidden; }
+
+.slide {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  display:flex; flex-direction:column; justify-content:center; align-items:center;
+  padding:50px 70px; opacity:0; transition:opacity .5s ease;
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(232,163,61,.07), transparent 60%),
+    radial-gradient(900px 480px at 8% -6%, rgba(91,141,239,.05), transparent 55%),
+    #0B0E14;
+}
+.slide.active { opacity:1; z-index:1; }
+.slide.prev { opacity:0; z-index:0; }
+
+.slide-h1 { font-family:"Noto Serif SC",serif; font-size:38px; font-weight:900; color:#E8A33D; margin-bottom:6px; letter-spacing:.02em; }
+.slide-h2 { font-size:16px; color:#98A2B3; margin-bottom:28px; font-weight:400; }
+.slide-num { position:absolute; bottom:20px; right:36px; font-size:12px; color:#5E6A7D; }
+.slide-tag { position:absolute; top:20px; left:36px; font-size:11px; color:#E8A33D; font-weight:600; text-transform:uppercase; letter-spacing:.1em; }
+
+.cover { text-align:center; }
+.cover .logo-big { font-family:"Noto Serif SC",serif; font-size:52px; font-weight:900; margin-bottom:10px; }
+.cover .logo-big b { color:#E8A33D; }
+.cover .subtitle { font-size:18px; color:#98A2B3; margin-bottom:32px; }
+.cover .tech-tags { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.cover .tech-tags span { padding:5px 14px; border:1px solid #232C3B; border-radius:999px; font-size:12px; color:#98A2B3; background:#141A25; }
+.cover .meta { margin-top:32px; font-size:12px; color:#5E6A7D; }
+
+.grid-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; width:100%; max-width:980px; }
+.grid-cards .card-pt { background:#141A25; border:1px solid #232C3B; border-radius:12px; padding:20px; transition:border-color .2s; }
+.grid-cards .card-pt:hover { border-color:#E8A33D; }
+.card-pt .ico { font-size:28px; margin-bottom:10px; }
+.card-pt h3 { font-size:15px; font-weight:700; color:#F2C879; margin-bottom:6px; }
+.card-pt p { font-size:12px; color:#98A2B3; line-height:1.6; }
+
+.two-col { display:flex; gap:36px; width:100%; max-width:980px; }
+.two-col .col { flex:1; }
+.two-col h3 { font-size:16px; color:#E8A33D; margin-bottom:14px; font-family:"Noto Serif SC",serif; }
+
+.feat-list { list-style:none; }
+.feat-list li { padding:8px 0; border-bottom:1px solid #1C2431; font-size:13px; color:#98A2B3; display:flex; align-items:flex-start; gap:8px; line-height:1.5; }
+.feat-list li:last-child { border-bottom:none; }
+.feat-list li .dot { color:#E8A33D; font-weight:700; flex-shrink:0; }
+
+.pt-table { width:100%; border-collapse:collapse; font-size:12px; max-width:980px; }
+.pt-table th { background:#1A2230; color:#E8A33D; padding:8px 12px; text-align:left; font-weight:600; border:1px solid #232C3B; }
+.pt-table td { padding:8px 12px; border:1px solid #232C3B; color:#98A2B3; background:#141A25; }
+.pt-table tr:hover td { background:#1A2230; }
+
+.role-row { display:flex; gap:18px; width:100%; max-width:980px; }
+.role-card { flex:1; background:#141A25; border:1px solid #232C3B; border-radius:12px; padding:20px; text-align:center; }
+.role-card .role-ico { font-size:32px; margin-bottom:10px; }
+.role-card h3 { font-size:15px; color:#F2C879; margin-bottom:4px; }
+.role-card .role-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; margin-bottom:10px; }
+.role-card .badge-player { background:rgba(91,141,239,.15); color:#5B8DEF; }
+.role-card .badge-creator { background:rgba(70,199,124,.15); color:#46C77C; }
+.role-card .badge-admin { background:rgba(229,105,91,.15); color:#E5695B; }
+.role-card p { font-size:11px; color:#98A2B3; line-height:1.6; text-align:left; }
+
+.arch-box { background:#141A25; border:1px solid #232C3B; border-radius:10px; padding:14px 20px; text-align:center; }
+.arch-box .arch-title { font-size:13px; font-weight:700; color:#E8A33D; margin-bottom:6px; }
+.arch-box .arch-items { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.arch-box .arch-items span { font-size:10px; padding:3px 8px; background:#1A2230; border-radius:5px; color:#98A2B3; }
+.arch-arrow { color:#E8A33D; font-size:20px; margin:6px 0; }
+
+.nav-controls { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:100; align-items:center; }
+.nav-controls button { width:36px; height:36px; border-radius:50%; border:1px solid #232C3B; background:#141A25; color:#98A2B3; font-size:14px; cursor:pointer; transition:all .2s; }
+.nav-controls button:hover { border-color:#E8A33D; color:#E8A33D; }
+.nav-controls .counter { font-size:12px; color:#5E6A7D; padding:0 6px; }
+
+.highlight-box { background:linear-gradient(135deg,rgba(232,163,61,.08),rgba(232,163,61,.02)); border:1px solid rgba(232,163,61,.3); border-radius:12px; padding:18px 26px; margin-bottom:16px; width:100%; max-width:880px; }
+.highlight-box h3 { color:#E8A33D; font-size:14px; margin-bottom:6px; }
+.highlight-box p { color:#98A2B3; font-size:12px; line-height:1.7; }
+
+.stats-row { display:flex; gap:20px; justify-content:center; }
+.stat-box { text-align:center; }
+.stat-box .num { font-family:"Noto Serif SC",serif; font-size:42px; font-weight:900; color:#E8A33D; }
+.stat-box .label { font-size:12px; color:#98A2B3; margin-top:2px; }
+
+.file-tree { font-family:"Cascadia Code","Consolas",monospace; font-size:11px; color:#98A2B3; line-height:1.7; white-space:pre; }
+.file-tree .dir { color:#E8A33D; font-weight:600; }
+.file-tree .file { color:#98A2B3; }
+
+.flow-box { background:#141A25; border:1px solid #232C3B; border-radius:10px; padding:12px 20px; font-size:12px; color:#98A2B3; text-align:center; min-width:200px; }
+.flow-box .flow-title { font-size:13px; font-weight:700; color:#E8A33D; margin-bottom:4px; }
+.flow-arrow { color:#E8A33D; font-size:18px; margin:4px 0; }
+</style>
+</head>
+<body>
+
+<!-- ============ Slide 1: 封面 ============ -->
+<div class="slide active" id="s1">
+  <div class="cover">
+    <div class="logo-big">GameReview <b>AI</b></div>
+    <div class="subtitle">Ollama 本地大模型驱动的游戏社区评测分享平台</div>
+    <div class="tech-tags">
+      <span>FastAPI</span>
+      <span>Ollama qwen2.5:3b</span>
+      <span>原生 HTML/CSS/JS</span>
+      <span>SQLAlchemy ORM</span>
+      <span>SQLite</span>
+    </div>
+    <div class="meta">2026-09-07 · 毕业项目介绍演示</div>
+  </div>
+  <div class="slide-num">1 / 16</div>
+</div>
+
+<!-- ============ Slide 2: 产品定位 ============ -->
+<div class="slide" id="s2">
+  <div class="slide-tag">PRODUCT</div>
+  <div class="slide-h1">产品定位</div>
+  <div class="slide-h2">以 Ollama 本地大模型为智能内核，融合评分、评测、社区与 AI 推荐</div>
+  <div class="grid-cards">
+    <div class="card-pt">
+      <div class="ico">🎯</div>
+      <h3>面向玩家</h3>
+      <p>发现好游戏、参与社区互动、获取真实评测与评分参考，AI 推荐助手智能匹配兴趣</p>
+    </div>
+    <div class="card-pt">
+      <div class="ico">✍️</div>
+      <h3>面向创作者</h3>
+      <p>发布评测攻略、四维评分（剧情/画面/玩法/优化）、AI 风控审核、积分等级体系</p>
+    </div>
+    <div class="card-pt">
+      <div class="ico">⚙️</div>
+      <h3>面向管理员</h3>
+      <p>后台审核管理、AI 审核日志、社区举报处理、数据仪表盘实时监控</p>
+    </div>
+  </div>
+  <div class="slide-num">2 / 16</div>
+</div>
+
+<!-- ============ Slide 3: 用户角色 ============ -->
+<div class="slide" id="s3">
+  <div class="slide-tag">USERS</div>
+  <div class="slide-h1">用户角色与权限</div>
+  <div class="slide-h2">三级角色体系 + 多账号同时登录 + 创作者等级 L0-L4</div>
+  <div class="role-row">
+    <div class="role-card">
+      <div class="role-ico">🎮</div>
+      <h3>玩家 Player</h3>
+      <span class="role-badge badge-player">player / player123</span>
+      <p>浏览全部内容、社区互动（发帖/评论/点赞/收藏/回复）、游戏评分与短评论、申请成为创作者</p>
+    </div>
+    <div class="role-card">
+      <div class="role-ico">✍️</div>
+      <h3>创作者 Creator</h3>
+      <span class="role-badge badge-creator">creator / creator123</span>
+      <p>玩家全部权限 + 发布评测攻略（四维评分）、AI 创作助手、创作者工作台、积分等级 L0-L4</p>
+    </div>
+    <div class="role-card">
+      <div class="role-ico">🛡️</div>
+      <h3>管理员 Admin</h3>
+      <span class="role-badge badge-admin">admin / admin123</span>
+      <p>创作者全部权限 + 后台管理（用户/游戏/评论/评测审核/社区/举报/AI 日志/仪表盘）</p>
+    </div>
+  </div>
+  <div class="highlight-box" style="margin-top:20px;">
+    <h3>🔄 多账号同时登录</h3>
+    <p>同一浏览器登录多个账号（localStorage gc_accounts），导航栏下拉一键切换，退出当前自动切到下一个。401 时自动移除失效账号并切换。添加账号入口：login.html?add=1</p>
+  </div>
+  <div class="slide-num">3 / 16</div>
+</div>
+
+<!-- ============ Slide 4: AI 三级降级架构 ============ -->
+<div class="slide" id="s4">
+  <div class="slide-tag">AI ENGINE</div>
+  <div class="slide-h1">AI 智能内核：三级降级</div>
+  <div class="slide-h2">Ollama 本地模型优先 → DeepSeek 云端备选 → 规则引擎兜底</div>
+  <div style="display:flex; flex-direction:column; align-items:center; gap:0; width:100%; max-width:880px;">
+    <div class="flow-box">
+      <div class="flow-title">① Ollama 本地模型（优先）</div>
+      <div>模型：qwen2.5:3b · 端点：localhost:11434/api/chat</div>
+      <div>注入：平台数据快照 + 游戏库目录 + 对话历史</div>
+      <div>参数：temperature=0.6, num_predict=600</div>
+    </div>
+    <div class="flow-arrow">↓ 不可用时降级</div>
+    <div class="flow-box">
+      <div class="flow-title">② DeepSeek 云端 API（备选）</div>
+      <div>模型：deepseek-chat · JSON response format</div>
+      <div>触发条件：DEEPSEEK_API_KEY 非空</div>
+    </div>
+    <div class="flow-arrow">↓ 不可用时降级</div>
+    <div class="flow-box">
+      <div class="flow-title">③ 规则引擎（兜底，零 AI 也可用）</div>
+      <div>意图识别 + 关键词匹配 + 游戏知识库 + 数据库查询</div>
+    </div>
+  </div>
+  <div class="slide-num">4 / 16</div>
+</div>
+
+<!-- ============ Slide 5: AI 对话详情 ============ -->
+<div class="slide" id="s5">
+  <div class="slide-tag">AI DETAILS</div>
+  <div class="slide-h1">AI 对话模块详解</div>
+  <div class="slide-h2">三层架构 · 实时数据快照 · 游戏名四层匹配</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>🔧 架构</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> <b>前端</b>：mock.js + 事件委托 data-qs/data-action + busy 防重复</li>
+        <li><span class="dot">▸</span> <b>后端</b>：ai_client.py（规则+Ollama+DeepSeek）</li>
+        <li><span class="dot">▸</span> <b>API</b>：POST /api/ai/chat（匿名可用）</li>
+        <li><span class="dot">▸</span> 4 个 Tab：推荐游戏 / 高分游戏 / 游戏百科 / 卡关</li>
+        <li><span class="dot">▸</span> 标签轮换：data-qs="q1|q2|q3" 竖线分隔按序轮换</li>
+        <li><span class="dot">▸</span> 创作者助手：快捷按钮 + 自由对话（需 creator 角色）</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>🧠 核心能力</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> <b>实时数据快照</b>：_build_platform_digest(db) 聚合统计</li>
+        <li><span class="dot">▸</span> 30 秒 TTL 缓存避免重复查聚合 SQL</li>
+        <li><span class="dot">▸</span> 快照内容：游戏数/分类/用户/评测/社区/评分/Top5</li>
+        <li><span class="dot">▸</span> <b>游戏名四层匹配</b>：别名 → 中文全名 → 英文名 → 归一化</li>
+        <li><span class="dot">▸</span> <b>推荐提取</b>：从自然语言回复中提取游戏名 → 卡片</li>
+        <li><span class="dot">▸</span> <b>强制规则</b>：标签专题（巡礼/百科/榜单）强制规则引擎</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-num">5 / 16</div>
+</div>
+
+<!-- ============ Slide 6: 游戏详情 ============ -->
+<div class="slide" id="s6">
+  <div class="slide-tag">GAME DETAIL</div>
+  <div class="slide-h1">游戏详情页</div>
+  <div class="slide-h2">三栏 Hero 布局 + 四维雷达评分 + 截图画廊</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>📐 三栏布局</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> <b>左栏</b>：Steam CDN 四图（600x900/header/capsule/hero）+ onerror SVG 兜底</li>
+        <li><span class="dot">▸</span> <b>中栏</b>：meta-grid 信息、标签、描述展开/收起、Steam 购买按钮</li>
+        <li><span class="dot">▸</span> <b>右栏</b>：综合评分 + 四维雷达 SVG + dim-chips + 我的评分 + 热门短评</li>
+        <li><span class="dot">▸</span> 下方：截图画廊（lightbox）+ 评测攻略 + 相似推荐</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>📊 评分系统</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> game_ratings 表 (game_id, user_id) 唯一约束</li>
+        <li><span class="dot">▸</span> score 为 int 1-10，重复提交 = 更新</li>
+        <li><span class="dot">▸</span> 综合评分 = 评测四维均值 + 用户分数加权</li>
+        <li><span class="dot">▸</span> 四维雷达仅从评测聚合（用户评分不影响四维）</li>
+        <li><span class="dot">▸</span> 两个 keyword 过滤器（按游戏名 vs 按评测内容）</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-num">6 / 16</div>
+</div>
+
+<!-- ============ Slide 7: 评测系统 ============ -->
+<div class="slide" id="s7">
+  <div class="slide-tag">REVIEWS</div>
+  <div class="slide-h1">评测攻略系统（PGC）</div>
+  <div class="slide-h2">创作者撰写 · AI 风控审核 · 积分等级体系</div>
+  <table class="pt-table">
+    <tr><th>环节</th><th>实现</th><th>规则</th></tr>
+    <tr><td>📝 评测结构</td><td>标题 + 关联游戏 + 正文 + 标签 + 四维评分（剧情/画面/玩法/优化）</td><td>仅 creator/admin 可发布</td></tr>
+    <tr><td>🤖 AI 审核</td><td>ai_audit() 检测广告引流词 + 辱骂引战词 → 风控评分</td><td>DeepSeek → 规则引擎降级</td></tr>
+    <tr><td>✅ 状态流转</td><td>draft → audit → published / rejected / manual_review</td><td>已通过全可见，其他仅作者可见</td></tr>
+    <tr><td>✏️ 编辑权限</td><td>L0 不可编辑；L1+ 每篇 1 次（edit_used 字段）</td><td>积分 100/300/600/1000</td></tr>
+    <tr><td>🏆 积分规则</td><td>发布+20 精选+30 获赞+0.2 收藏+0.5</td><td>删除扣回+额外30 抄袭清零</td></tr>
+    <tr><td>📋 排序</td><td>精选 is_featured → 创作者等级 → 发布时间</td><td>—</td></tr>
+    <tr><td>📄 管理</td><td>5 个状态分类标签 + 分页（工作台 + 个人中心）</td><td>5条/页（个人中心）10条/页（工作台）</td></tr>
+  </table>
+  <div class="slide-num">7 / 16</div>
+</div>
+
+<!-- ============ Slide 8: 社区系统 ============ -->
+<div class="slide" id="s8">
+  <div class="slide-tag">COMMUNITY</div>
+  <div class="slide-h1">社区系统（UGC）</div>
+  <div class="slide-h2">帖子 · 图片上传 · 楼中楼评论 · 频率限制</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>📢 帖子功能</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> 标题（2-100 字）+ 正文 + 图片（≤9 张，≤5MB/张）</li>
+        <li><span class="dot">▸</span> 标签单选：游戏 / 闲聊 / 攻略 / 吐槽</li>
+        <li><span class="dot">▸</span> 排序：推荐（热度）/ 最新 / 标签筛选</li>
+        <li><span class="dot">▸</span> 频率限制：发帖 30s/次，评论 10s/次</li>
+        <li><span class="dot">▸</span> 图片上传：FormData → /api/community/upload → static/uploads</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>💬 互动功能</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> 点赞、收藏、评论（楼中楼回复 parent_id）</li>
+        <li><span class="dot">▸</span> 删除自己的帖子 / 评论</li>
+        <li><span class="dot">▸</span> 我的收藏/点赞仅本人可见（他人 403）</li>
+        <li><span class="dot">▸</span> 帖主可删除其下所有评论</li>
+        <li><span class="dot">▸</span> 管理员可删除违规帖 + 封禁用户</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-num">8 / 16</div>
+</div>
+
+<!-- ============ Slide 9: 评论系统 ============ -->
+<div class="slide" id="s9">
+  <div class="slide-tag">COMMENTS</div>
+  <div class="slide-h1">评论系统</div>
+  <div class="slide-h2">统一模型 · 楼中楼回复 · 删除权限</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>💬 统一评论模型</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> Comment 表，target_type 区分：game（短评）/ review（评测评论）</li>
+        <li><span class="dot">▸</span> parent_id 支持楼中楼嵌套回复</li>
+        <li><span class="dot">▸</span> DELETE /comments/{id}：仅本人或 admin 可删</li>
+        <li><span class="dot">▸</span> can_delete 字段：前端据此渲染删除按钮</li>
+        <li><span class="dot">▸</span> 级联删除子回复</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>🎮 游戏短评特色</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> 自动精选：最高赞 + 最早创建（后端运行时计算）</li>
+        <li><span class="dot">▸</span> 分页：每页 5-10 条（page_size clamp 1-10）</li>
+        <li><span class="dot">▸</span> 显示顺序：精选 → 普通分页（时间倒序）</li>
+        <li><span class="dot">▸</span> 「我的评论」：GET /comments/mine 聚合两种类型</li>
+        <li><span class="dot">▸</span> 点击跳转 #comment-{id} 锚点直达原文</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-num">9 / 16</div>
+</div>
+
+<!-- ============ Slide 10: 消息通知 ============ -->
+<div class="slide" id="s10">
+  <div class="slide-tag">NOTIFICATIONS</div>
+  <div class="slide-h1">消息通知系统</div>
+  <div class="slide-h2">10 秒轮询 · 5 类通知 · 直达操作页 · 全埋点</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>🔔 通知类型与埋点</h3>
+      <ul class="feat-list">
+        <li><span class="dot">💬</span> <b>评论回复</b>：有人回复你的评论 → notify.push</li>
+        <li><span class="dot">👍</span> <b>点赞</b>：评测/评论被赞 → 通知作者（自己不通知自己）</li>
+        <li><span class="dot">⭐</span> <b>收藏</b>：评测被收藏 → 通知作者</li>
+        <li><span class="dot">⚖️</span> <b>审核结果</b>：通过/驳回 → 通知创作者</li>
+        <li><span class="dot">📝</span> <b>创作者申请</b>：提交→通知管理员；通过/驳回→通知申请人</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>⚡ 实时性设计</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> 导航栏铃铛 10s 轮询未读数</li>
+        <li><span class="dot">▸</span> 消息中心 10s 轮询通知列表</li>
+        <li><span class="dot">▸</span> 5 个 Tab + 只看未读 + 全部已读 + 分页</li>
+        <li><span class="dot">▸</span> 点击消息 → 标记已读 + 直达对应页</li>
+        <li><span class="dot">▸</span> notify.push_to_admins 通知全部管理员</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-num">10 / 16</div>
+</div>
+
+<!-- ============ Slide 11: 管理后台 ============ -->
+<div class="slide" id="s11">
+  <div class="slide-tag">ADMIN</div>
+  <div class="slide-h1">管理后台</div>
+  <div class="slide-h2">7 大模块 · 5-8 秒轮询 · 分页管理</div>
+  <table class="pt-table">
+    <tr><th>模块</th><th>功能</th><th>特色</th></tr>
+    <tr><td>📊 数据仪表盘</td><td>平台概览统计</td><td>实时数据</td></tr>
+    <tr><td>👥 用户管理</td><td>用户列表 + 创作者申请审批</td><td>5-8s 轮询，离开销毁定时器</td></tr>
+    <tr><td>⚖️ 审核队列</td><td>待审核评测 + 通过/驳回 + AI 日志</td><td>5-8s 轮询，离开销毁定时器</td></tr>
+    <tr><td>🎮 游戏管理</td><td>游戏 CRUD + 分类管理</td><td>10 条/页分页</td></tr>
+    <tr><td>💬 评论管理</td><td>全站评论列表 + 删除违规</td><td>10 条/页分页</td></tr>
+    <tr><td>📢 社区管理</td><td>举报队列 + 帖子管理</td><td>关键词搜索 + 查看跳转</td></tr>
+    <tr><td>📋 已发布评测</td><td>已通过评测列表</td><td>分页浏览</td></tr>
+  </table>
+  <div class="slide-num">11 / 16</div>
+</div>
+
+<!-- ============ Slide 12: 个人中心与创作者 ============ -->
+<div class="slide" id="s12">
+  <div class="slide-tag">PROFILE</div>
+  <div class="slide-h1">个人中心 & 创作者工作台</div>
+  <div class="slide-h2">锚点导航 · 状态分类 · 分页管理</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>👤 个人中心</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> 锚点快捷导航（收藏/评测/评论/社区/游玩档案）</li>
+        <li><span class="dot">▸</span> 我的评测：5 个状态标签 + 分页（5 条/页）</li>
+        <li><span class="dot">▸</span> 我的评论：聚合两种评论，点击跳转原文 + 删除</li>
+        <li><span class="dot">▸</span> 评测互动：我赞过的 / 我收藏的</li>
+        <li><span class="dot">▸</span> 社区：我的帖子 / 收藏 / 点赞（三 Tab）</li>
+        <li><span class="dot">▸</span> 创作者申请：理由 + 擅长 + 经历</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>✍️ 创作者工作台</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> 评测管理表格：5 个状态标签 + 分页（10 条/页）</li>
+        <li><span class="dot">▸</span> 操作：查看 / 编辑 / 提交审核 / 删除</li>
+        <li><span class="dot">▸</span> AI 攻略创作助手（快捷按钮 + 自由对话）</li>
+        <li><span class="dot">▸</span> 创作者统计数据</li>
+        <li><span class="dot">▸</span> 轮询防抖签名纳入 page+status</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-num">12 / 16</div>
+</div>
+
+<!-- ============ Slide 13: 智能返回 ============ -->
+<div class="slide" id="s13">
+  <div class="slide-tag">UX</div>
+  <div class="slide-h1">智能返回 & 多账号</div>
+  <div class="slide-h2">三级返回策略 + 无缝账号切换</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>↩️ 智能返回 U.goBack()</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> <b>同标签页</b>（history>1 且非弹出）→ history.back()</li>
+        <li><span class="dot">▸</span> <b>新标签页</b>（target=_blank，如管理员查看）→ document.referrer</li>
+        <li><span class="dot">▸</span> <b>兜底</b> → fallback URL（如 game-list.html）</li>
+        <li><span class="dot">▸</span> 覆盖 6 个页面：game-detail / review-detail / review-list / community-post / community-new / creator-edit</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>🔐 多账号登录</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> gc_accounts 存储已登录账号列表 [{token, user}]</li>
+        <li><span class="dot">▸</span> setSession 自动去重（按 user.id）</li>
+        <li><span class="dot">▸</span> 导航栏下拉展示全部账号，当前 ✓ 标记</li>
+        <li><span class="dot">▸</span> 一键切换（switchAccount → reload）</li>
+        <li><span class="dot">▸</span> 退出当前自动切到下一个</li>
+        <li><span class="dot">▸</span> 401 自动移除失效账号 + 切换</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-num">13 / 16</div>
+</div>
+
+<!-- ============ Slide 14: 技术架构 ============ -->
+<div class="slide" id="s14">
+  <div class="slide-tag">ARCHITECTURE</div>
+  <div class="slide-h1">技术架构</div>
+  <div class="slide-h2">FastAPI + Ollama 本地模型 + 原生前端 · 单进程按需启动</div>
+  <div class="two-col">
+    <div class="col">
+      <h3>🔧 技术栈</h3>
+      <ul class="feat-list">
+        <li><span class="dot">▸</span> <b>后端</b>：FastAPI ≥0.110 + SQLAlchemy ≥1.4 + SQLite</li>
+        <li><span class="dot">▸</span> <b>AI</b>：Ollama qwen2.5:3b（本地）+ DeepSeek（备选）+ 规则引擎</li>
+        <li><span class="dot">▸</span> <b>前端</b>：原生 HTML/CSS/JS（无框架）+ 模块化</li>
+        <li><span class="dot">▸</span> <b>认证</b>：python-jose JWT + bcrypt</li>
+        <li><span class="dot">▸</span> <b>部署</b>：uvicorn 单进程 + start-platform.bat 一键启动</li>
+        <li><span class="dot">▸</span> <b>HTTP</b>：httpx 异步客户端</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>📁 项目结构</h3>
+      <div class="file-tree"><span class="dir">app/</span>
+  <span class="dir">routers/</span> 12 个路由文件
+  models.py · schemas.py
+  services.py · repositories.py
+  ai_client.py · notify.py
+  <span class="dir">core/</span> config.py · deps.py · points.py
+  <span class="dir">db/</span> base.py · init_db.py
+<span class="dir">static/</span>
+  <span class="dir">js/</span> api/common/auth/mock
+  <span class="dir">css/</span> style.css (proto12)
+  18 个前台 HTML
+  <span class="dir">admin/</span> 6 个后台 HTML
+<span class="dir">docs/</span> PRD_GameReview_AI.md
+main.py · .env · requirements.txt</div>
+    </div>
+  </div>
+  <div class="slide-num">14 / 16</div>
+</div>
+
+<!-- ============ Slide 15: 数据统计 ============ -->
+<div class="slide" id="s15">
+  <div class="slide-tag">DATA</div>
+  <div class="slide-h1">种子数据与统计</div>
+  <div class="slide-h2">完整 Mock 数据覆盖全功能场景</div>
+  <div class="stats-row">
+    <div class="stat-box"><div class="num">7</div><div class="label">用户</div></div>
+    <div class="stat-box"><div class="num">30</div><div class="label">游戏</div></div>
+    <div class="stat-box"><div class="num">7</div><div class="label">分类</div></div>
+    <div class="stat-box"><div class="num">67</div><div class="label">评测</div></div>
+    <div class="stat-box"><div class="num">12</div><div class="label">API 路由</div></div>
+    <div class="stat-box"><div class="num">24</div><div class="label">页面</div></div>
+  </div>
+  <div class="highlight-box" style="margin-top:28px;">
+    <h3>🔑 关键设计决策</h3>
+    <p>① AI 三级降级（Ollama→DeepSeek→规则）保证零 AI 也可用 ② 实时数据快照 30s TTL 缓存 ③ notify.push 自己不通知自己 ④ CSS 变量重映射保留旧类名兼容 ⑤ 按需一键启动非开机自启 ⑥ Comment.target_type 统一游戏短评/评测评论 ⑦ can_delete 字段前端渲染删除按钮 ⑧ Ollama 不参与审核，审核仅 DeepSeek/规则引擎</p>
+  </div>
+  <div class="slide-num">15 / 16</div>
+</div>
+
+<!-- ============ Slide 16: 结尾 ============ -->
+<div class="slide" id="s16">
+  <div class="cover">
+    <div class="logo-big">谢谢 <b>观看</b></div>
+    <div class="subtitle">GameReview AI — Ollama 本地大模型驱动的游戏社区评测分享平台</div>
+    <div class="tech-tags">
+      <span>🤖 Ollama qwen2.5:3b</span>
+      <span>🎮 30 款游戏</span>
+      <span>✍️ PGC 评测</span>
+      <span>📢 UGC 社区</span>
+      <span>🔔 实时通知</span>
+      <span>🔐 多账号</span>
+    </div>
+    <div class="meta" style="margin-top:32px;">
+      访问地址：http://127.0.0.1:8000/static/index.html<br>
+      PRD 文档：docs/PRD_GameReview_AI.md
+    </div>
+  </div>
+  <div class="slide-num">16 / 16</div>
+</div>
+
+<!-- ============ 导航控制 ============ -->
+<div class="nav-controls">
+  <button onclick="prevSlide()" title="上一页">←</button>
+  <span class="counter"><span id="curPage">1</span> / 16</span>
+  <button onclick="nextSlide()" title="下一页">→</button>
+</div>
+
+<script>
+var total = 16;
+var cur = 1;
+function showSlide(n) {
+  cur = Math.max(1, Math.min(total, n));
+  for (var i = 1; i <= total; i++) {
+    var el = document.getElementById('s' + i);
+    el.classList.remove('active','prev');
+    if (i < cur) el.classList.add('prev');
+    else if (i === cur) el.classList.add('active');
+  }
+  document.getElementById('curPage').textContent = cur;
+}
+function nextSlide() { if (cur < total) showSlide(cur + 1); }
+function prevSlide() { if (cur > 1) showSlide(cur - 1); }
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); nextSlide(); }
+  if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prevSlide(); }
+  if (e.key === 'Home') showSlide(1);
+  if (e.key === 'End') showSlide(total);
+});
+</script>
+</body>
+</html>

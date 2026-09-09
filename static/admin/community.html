@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>社区与举报 — 管理后台</title>
+<link rel="stylesheet" href="../css/style.css?v=proto12">
+</head>
+<body>
+<div id="navbar"></div>
+<div class="admin-layout">
+  <aside class="admin-side" id="adminSide"></aside>
+  <main class="admin-main">
+    <h2 class="section-title">📢 社区与举报</h2>
+    <p class="dim" style="margin-bottom:14px;">处理用户举报：驳回 / 删除违规内容 / 删除并封禁作者；也可直接管理全站帖子。社区发帖免审，举报是核心治理手段。</p>
+
+    <div class="seg" id="tabSeg" style="margin-bottom:14px;">
+      <button data-tab="reports" class="active">🚩 举报队列 <span id="rpBadge" class="badge badge-red" style="margin-left:4px;">0</span></button>
+      <button data-tab="posts">📝 帖子管理</button>
+    </div>
+
+    <!-- 举报队列 -->
+    <div id="tabReports">
+      <div class="card table-wrap">
+        <table class="data">
+          <thead><tr><th>对象</th><th style="width:28%;">内容摘要</th><th>理由</th><th>举报人</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody id="reportBody"><tr><td colspan="7" class="dim" style="text-align:center; padding:20px;">加载中…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="reportPager" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- 帖子管理 -->
+    <div id="tabPosts" style="display:none;">
+      <div class="card" style="margin-bottom:12px; padding:12px;">
+        <div class="flex" style="gap:10px; align-items:center; flex-wrap:wrap;">
+          <input class="input" id="pKw" placeholder="搜索帖子标题/正文" style="flex:1; min-width:220px;" oninput="onKwInput()">
+          <a class="btn btn-sm" href="../community.html" target="_blank">在前台查看社区 ↗</a>
+        </div>
+      </div>
+      <div class="card table-wrap">
+        <table class="data">
+          <thead><tr><th style="width:32%;">标题</th><th>标签</th><th>作者</th><th>互动</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody id="postBody"><tr><td colspan="6" class="dim" style="text-align:center; padding:20px;">加载中…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="postPager" style="margin-top:10px;"></div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/mock.js"></script>
+<script src="../js/api.js?v=cmnt1"></script>
+<script src="../js/auth.js?v=cmnt1"></script>
+<script src="../js/common.js?v=cmnt1"></script>
+<script>
+if (!Auth.mountAdmin('community')) throw new Error('redirect');
+
+var allReports = [], allPosts = [], kwTimer = null;
+var PAGE_SIZE = 10;
+var rpPage = 1, postPage = 1;
+
+function renderPager(containerId, totalPages, current, onGo) {
+  document.getElementById(containerId).innerHTML = U.pagination(totalPages, current, function (p) {
+    onGo(p);
+  });
+}
+
+U.$all('#tabSeg button').forEach(function (b) {
+  b.onclick = function () {
+    U.$all('#tabSeg button').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    var t = b.dataset.tab;
+    document.getElementById('tabReports').style.display = t === 'reports' ? '' : 'none';
+    document.getElementById('tabPosts').style.display = t === 'posts' ? '' : 'none';
+  };
+});
+
+/* ---------- 举报队列 ---------- */
+async function loadReports() {
+  try {
+    var data = await Api.get('/admin/reports?status=pending');
+    allReports = data.items;
+    document.getElementById('rpBadge').textContent = allReports.length;
+    renderReports();
+  } catch (e) { U.toast(e.message, 'error'); }
+}
+
+function renderReports() {
+  var body = document.getElementById('reportBody');
+  if (!allReports.length) {
+    body.innerHTML = '<tr><td colspan="7" class="dim" style="text-align:center; padding:20px;">🎉 暂无待处理举报</td></tr>';
+    document.getElementById('reportPager').innerHTML = '';
+    return;
+  }
+  var totalPages = Math.max(1, Math.ceil(allReports.length / PAGE_SIZE));
+  if (rpPage > totalPages) rpPage = totalPages;
+  var pageItems = allReports.slice((rpPage - 1) * PAGE_SIZE, rpPage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (r) {
+    var link = r.target_type === 'post'
+      ? '<a href="../community-post.html?id=' + r.target_id + '" target="_blank" style="color:var(--accent-2);">帖子 #' + r.target_id + '</a>'
+      : '评论 #' + r.target_id;
+    var existWarn = r.target_exists ? '' : ' <span class="badge badge-gray">已删</span>';
+    return '<tr>'
+      + '<td style="font-size:13px;">' + (r.target_type === 'post' ? '📝 帖子' : '💬 评论') + ' #' + r.target_id + existWarn + '<br><span class="dim" style="font-size:11px;">' + link + '</span></td>'
+      + '<td style="max-width:300px;"><div style="white-space:normal; word-break:break-all; line-height:1.5; font-size:13px;">' + U.esc(r.target_title || '(内容已删除)') + '</div>'
+      + (r.detail ? '<div class="dim" style="font-size:12px; margin-top:4px;">补充：' + U.esc(r.detail) + '</div>' : '') + '</td>'
+      + '<td><span class="badge badge-red">' + U.esc(r.reason) + '</span></td>'
+      + '<td>' + U.esc(r.reporter) + '</td>'
+      + '<td><span class="badge badge-amber">待处理</span></td>'
+      + '<td class="dim" style="font-size:12px;">' + U.fmtDate(r.created_at) + '</td>'
+      + '<td><div class="flex" style="gap:6px; flex-wrap:wrap;">'
+      + (r.target_type === 'post' && r.target_exists ? '<a class="btn btn-sm" href="../community-post.html?id=' + r.target_id + '" target="_blank">查看</a> ' : '')
+      + '<button class="btn btn-sm" onclick="handleReport(' + r.id + ',\'dismiss\')">驳回</button>'
+      + '<button class="btn btn-sm btn-danger" onclick="handleReport(' + r.id + ',\'remove\')">删除内容</button>'
+      + '<button class="btn btn-sm btn-danger" onclick="handleReport(' + r.id + ',\'ban\')">删+封禁</button>'
+      + '</div></td></tr>';
+  }).join('');
+  renderPager('reportPager', totalPages, rpPage, function (p) { rpPage = p; renderReports(); });
+}
+
+window.handleReport = async function (id, action) {
+  var tip = { dismiss: '驳回这条举报？', remove: '确定删除被举报的内容？', ban: '确定删除内容并封禁作者？封禁后该账号无法登录发言！' }[action];
+  if (!confirm(tip)) return;
+  try {
+    await Api.post('/admin/reports/' + id + '/handle', { action: action });
+    U.toast('已处理', 'success');
+    loadReports(); loadPosts();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+/* ---------- 帖子管理 ---------- */
+async function loadPosts() {
+  try {
+    var data = await Api.get('/admin/community/posts');
+    allPosts = data.items;
+    renderPosts();
+  } catch (e) { U.toast(e.message, 'error'); }
+}
+
+function onKwInput() {
+  clearTimeout(kwTimer);
+  kwTimer = setTimeout(renderPosts, 250);
+}
+
+function renderPosts() {
+  var kw = (document.getElementById('pKw').value || '').trim().toLowerCase();
+  var list = allPosts.filter(function (p) {
+    if (!kw) return true;
+    return (p.title + ' ' + p.summary + ' ' + p.author).toLowerCase().indexOf(kw) >= 0;
+  });
+  var body = document.getElementById('postBody');
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="6" class="dim" style="text-align:center; padding:20px;">没有符合条件的帖子</td></tr>';
+    document.getElementById('postPager').innerHTML = '';
+    return;
+  }
+  var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (postPage > totalPages) postPage = totalPages;
+  var pageItems = list.slice((postPage - 1) * PAGE_SIZE, postPage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (p) {
+    return '<tr>'
+      + '<td><a href="../community-post.html?id=' + p.id + '" target="_blank" style="color:var(--accent-2); font-weight:600;">' + U.esc(p.title) + '</a>'
+      + (p.reported ? ' <span class="badge badge-red">被举报</span>' : '')
+      + '<div class="dim" style="font-size:12px; margin-top:3px; white-space:normal;">' + U.esc(p.summary) + '</div></td>'
+      + '<td><span class="badge badge-blue">' + U.esc(p.tag) + '</span></td>'
+      + '<td>' + U.esc(p.author) + '</td>'
+      + '<td class="dim" style="font-size:12px; white-space:nowrap;">👍' + p.like_count + ' ⭐' + p.fav_count + ' 💬' + p.comment_count + ' 👁' + p.view_count + '</td>'
+      + '<td class="dim" style="font-size:12px;">' + U.fmtDate(p.created_at) + '</td>'
+      + '<td><div class="flex" style="gap:6px; flex-wrap:wrap;">'
+      + '<a class="btn btn-sm" href="../community-post.html?id=' + p.id + '" target="_blank">查看</a> '
+      + '<button class="btn btn-sm btn-danger" onclick="delPost(' + p.id + ')">删除</button>'
+      + '</div></td></tr>';
+  }).join('');
+  renderPager('postPager', totalPages, postPage, function (p) { postPage = p; renderPosts(); });
+}
+
+window.delPost = async function (id) {
+  if (!confirm('确定删除这条帖子？其评论将一并删除，不可恢复。')) return;
+  try {
+    await Api.del('/admin/community/posts/' + id);
+    U.toast('帖子已删除', 'success');
+    loadPosts(); loadReports();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+loadReports();
+loadPosts();
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>创作者工作台 — AI 游戏社区评测分享平台</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
@@ -22,26 +22,69 @@
     <div class="card stat-card"><div class="num" id="stFav" style="color:var(--gold);">-</div><div class="label">总收藏数</div></div>
   </div>
 
+  <!-- 积分与等级 -->
+  <div class="card mb-16">
+    <div class="points-panel">
+      <div class="points-block">
+        <div class="points-num" id="ptNum">-</div>
+        <div class="cap">当前积分</div>
+      </div>
+      <div class="points-block">
+        <div id="ptBadge" style="font-size:15px; margin-top:8px;">-</div>
+        <div class="cap" id="ptBenefit" style="margin-top:6px;"></div>
+      </div>
+      <div class="points-progress">
+        <div id="ptNext" class="dim" style="font-size:13px;"></div>
+        <div class="progress-track"><div class="progress-fill" id="ptBar" style="width:0%"></div></div>
+        <div class="dim" style="font-size:12px;">积分仅来自通过审核的 PGC 游戏评测，社区帖子不计分</div>
+      </div>
+    </div>
+    <hr style="border:none;border-top:1px dashed var(--border);margin:14px 0 6px;">
+    <ul class="points-rules" id="ptRules"></ul>
+  </div>
+
+  <div class="card table-wrap mb-16">
+    <h3 class="section-title" style="font-size:16px; margin:4px 0 10px;">🧾 积分流水</h3>
+    <div id="recordList"><div class="dim" style="padding:12px 0;">加载中…</div></div>
+    <div id="recordPager"></div>
+  </div>
+
   <div class="card table-wrap">
+    <div class="flex" style="gap:8px; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap;">
+      <div class="seg" id="rvFilter">
+        <button class="active" data-status="all">全部</button>
+        <button data-status="published">已发布</button>
+        <button data-status="draft">草稿</button>
+        <button data-status="audit">待审核</button>
+        <button data-status="rejected">已驳回</button>
+      </div>
+      <span class="dim" style="font-size:12px;" id="rvCount"></span>
+    </div>
     <table class="data">
       <thead>
         <tr><th>标题</th><th>关联游戏</th><th>状态</th><th>AI 风险分</th><th>阅读</th><th>点赞</th><th>创建时间</th><th>操作</th></tr>
       </thead>
       <tbody id="reviewBody"></tbody>
     </table>
+    <div id="rvPager"></div>
   </div>
 </div>
 
 <div id="footerSlot"></div>
 
 <script src="js/mock.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
 <script>
-if (!Auth.requireRole('creator')) throw new Error('redirect');
-Auth.mountNav('creator');
-document.getElementById('footerSlot').innerHTML = U.footer();
+/* 启动流程：先拉取最新身份（管理员审批通过后无需重新登录即成为创作者），再做权限守卫 */
+(async function boot() {
+  try { await Auth.refreshUser(); } catch (e) { /* 未登录时由守卫处理 */ }
+  if (!Auth.requireRole('creator')) throw new Error('redirect');
+  Auth.mountNav('creator');
+  document.getElementById('footerSlot').innerHTML = U.footer();
+  init();
+})();
 
 async function init() {
   var stats = await Api.get('/creator/statistics');
@@ -49,27 +92,113 @@ async function init() {
   document.getElementById('stRead').textContent = U.fmtNum(stats.total_read);
   document.getElementById('stLike').textContent = U.fmtNum(stats.total_like);
   document.getElementById('stFav').textContent = U.fmtNum(stats.total_favorite);
+  loadPoints();
+  loadRecords(1);
   loadReviews();
 }
 
-async function loadReviews() {
-  var data = await Api.get('/creator/reviews');
+async function loadPoints() {
+  var ov = await Api.get('/creator/points');
+  document.getElementById('ptNum').textContent = ov.points;
+  document.getElementById('ptBadge').innerHTML = Auth.levelBadge(ov.level);
+  document.getElementById('ptBenefit').textContent = ov.benefit || '';
+  if (ov.is_max) {
+    document.getElementById('ptNext').textContent = '🎉 已达最高等级，感谢持续产出优质评测！';
+    document.getElementById('ptBar').style.width = '100%';
+  } else {
+    var start = ov.next_level ? ov.next_level.min_points - ov.points_to_next : 0;
+    var pct = ov.next_level && ov.next_level.min_points > start
+      ? Math.max(2, Math.round((ov.points - start) / (ov.next_level.min_points - start) * 100)) : 100;
+    document.getElementById('ptNext').textContent = '距 ' + ov.next_level.code + ' ' + ov.next_level.name
+      + ' 还需 ' + ov.points_to_next + ' 分';
+    document.getElementById('ptBar').style.width = pct + '%';
+  }
+  document.getElementById('ptRules').innerHTML = (ov.rules || []).map(function (t) {
+    return '<li>· ' + U.esc(t) + '</li>';
+  }).join('');
+}
+
+async function loadRecords(page) {
+  try {
+    /* 注意：Api.get 的查询参数必须拼在路径里（第二个参数会被忽略） */
+    var data = await Api.get('/creator/point-records?page=' + (page || 1) + '&page_size=10');
+    /* 页码越界保护：当前页超出总页数时回落到最后一页 */
+    if (data.page > data.total_pages && data.total_pages >= 1) {
+      return loadRecords(data.total_pages);
+    }
+    var list = document.getElementById('recordList');
+    if (!data.items.length) {
+      list.innerHTML = '<div class="dim" style="padding:8px 0;">暂无积分变动记录，发布评测通过审核后开始累计。</div>';
+      document.getElementById('recordPager').innerHTML = '';
+      return;
+    }
+    list.innerHTML = data.items.map(function (r) {
+      var plus = r.change >= 0;
+      return '<div class="record-row">'
+        + '<div><div class="reason">' + U.esc(r.reason) + '</div>'
+        + '<div class="meta">' + U.fmtDate(r.created_at) + '｜余额 ' + r.balance_after + '</div></div>'
+        + '<div class="record-change ' + (plus ? 'plus' : 'minus') + '">' + (plus ? '+' : '') + r.change + '</div>'
+        + '</div>';
+    }).join('');
+    /* U.pagination 已内置首末页按钮置灰（disabled） */
+    document.getElementById('recordPager').innerHTML =
+      '<div class="dim" style="font-size:12px; margin-bottom:6px;">共 ' + data.total + ' 条记录 · 第 ' + data.page + ' / ' + data.total_pages + ' 页</div>'
+      + U.pagination(data.total_pages, data.page, loadRecords);
+  } catch (e) {
+    document.getElementById('recordList').innerHTML = '<div class="dim">' + U.esc(e.message) + '</div>';
+  }
+}
+
+var reviewListSig = '';   // 数据签名：轮询拉到的状态无变化时跳过重渲染
+var rvState = { status: 'all', page: 1 };
+
+U.$all('#rvFilter button').forEach(function (b) {
+  b.onclick = function () {
+    U.$all('#rvFilter button').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    rvState.status = b.dataset.status;
+    rvState.page = 1;
+    reviewListSig = '';       // 切换分类时强制重绘
+    loadReviews();
+  };
+});
+
+async function loadReviews(page) {
+  rvState.page = page || rvState.page || 1;
+  var q = '/creator/reviews?page=' + rvState.page + '&page_size=10'
+    + (rvState.status !== 'all' ? '&status=' + rvState.status : '');
+  var data = await Api.get(q);
+  /* 轮询防抖：签名一致则不重绘 */
+  var sig = JSON.stringify({
+    page: rvState.page, status: rvState.status,
+    items: data.items.map(function (r) {
+      return [r.id, r.status, r.audit_reason, r.read_count, r.like_count, r.fav_count];
+    })
+  });
+  if (sig === reviewListSig) return;
+  reviewListSig = sig;
+  document.getElementById('rvCount').textContent = '共 ' + data.total + ' 篇';
   var body = document.getElementById('reviewBody');
   if (!data.items.length) {
-    body.innerHTML = '<tr><td colspan="8" class="empty"><div class="icon">✍️</div>还没有文章，点击右上角「新建评测」开始创作</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="empty"><div class="icon">✍️</div>该分类下还没有文章</td></tr>';
+    document.getElementById('rvPager').innerHTML = '';
     return;
   }
   body.innerHTML = data.items.map(function (r) {
-    var actions = '';
+    var actions = '<a class="btn btn-sm" href="review-detail.html?review_id=' + r.id + '">查看</a>';
     if (r.status === 'draft' || r.status === 'rejected') {
-      actions = '<a class="btn btn-sm" href="creator-edit.html?id=' + r.id + '">编辑</a>'
+      actions += '<a class="btn btn-sm" href="creator-edit.html?id=' + r.id + '">编辑</a>'
         + '<button class="btn btn-sm btn-primary" onclick="submitAudit(' + r.id + ')">提交审核</button>'
         + '<button class="btn btn-sm btn-danger" onclick="delReview(' + r.id + ')">删除</button>';
     } else if (r.status === 'published') {
-      actions = '<a class="btn btn-sm" href="game-detail.html?id=' + r.game_id + '">查看</a>'
+      var me = Auth.user() || {};
+      var canEdit = (me.creator_level || 0) >= 1 && !r.edit_used;
+      actions += (canEdit
+        ? '<a class="btn btn-sm" href="creator-edit.html?id=' + r.id + '" title="L1 权益：已发布评测可编辑 1 次">编辑</a>'
+        : '<span class="dim" title="' + (r.edit_used ? '本篇 1 次编辑机会已用完' : 'L1 普通创作者起可编辑已发布评测 1 次') + '">🔒</span>')
         + '<button class="btn btn-sm btn-danger" onclick="delReview(' + r.id + ')">删除</button>';
     } else {
-      actions = '<span class="dim">审核处理中…</span>';
+      actions += '<span class="dim">待管理员审核…</span>';
     }
     var reason = r.status === 'rejected' && r.audit_reason
       ? '<div class="dim" style="color:var(--red); margin-top:4px; font-size:12px; max-width:260px;">驳回原因：' + U.esc(r.audit_reason) + '</div>' : '';
@@ -82,15 +211,17 @@ async function loadReviews() {
       + '<td>' + U.fmtDate(r.created_at) + '</td>'
       + '<td class="actions">' + actions + '</td></tr>';
   }).join('');
+  document.getElementById('rvPager').innerHTML =
+    U.pagination(data.total_pages, data.page, loadReviews);
 }
 
 window.submitAudit = async function (id) {
-  if (!confirm('提交后将由 AI 自动审核，确认提交？')) return;
+  if (!confirm('提交后进入管理员审核队列（待审核期间前台不可见），确认提交？')) return;
   try {
     var res = await Api.post('/reviews/' + id + '/submit-audit');
-    if (res.status === 'published') U.toast('🎉 ' + res.message, 'success');
-    else if (res.status === 'rejected') U.toast('❌ ' + res.message + '（' + res.audit.reasons.join('；') + '）', 'error');
-    else U.toast('⏳ ' + res.message, 'info');
+    if (res.status === 'pending') U.toast('⏳ ' + res.message, 'info');
+    else if (res.status === 'published') U.toast('🎉 ' + res.message, 'success');
+    else U.toast(res.message, 'error');
     loadReviews();
   } catch (e) { U.toast(e.message, 'error'); }
 };
@@ -104,7 +235,9 @@ window.delReview = async function (id) {
   } catch (e) { U.toast(e.message, 'error'); }
 };
 
-init();
+/* ===== 评测状态轮询（方案一，间隔 6s）：进入页面即拉取最新审核状态，管理员通过/驳回后自动同步；离开页面销毁定时器 ===== */
+var reviewListTimer = setInterval(function () { loadReviews(); }, 6000);
+window.addEventListener('beforeunload', function () { clearInterval(reviewListTimer); });
 </script>
 </body>
 </html>

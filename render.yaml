@@ -1,0 +1,22 @@
+# Render Blueprint — 一键部署 GameReview AI
+# 文档：https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: gamereview-ai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      # 云端没有本地 Ollama 服务，关闭后 AI 对话/审核自动走规则引擎（全部功能可用）
+      - key: OLLAMA_ENABLED
+        value: "0"
+      # JWT 密钥自动生成（也可换成自己的随机字符串）
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      # 可选：填入 DeepSeek API Key 后 AI 对话升级为云端大模型（不填则用规则引擎）
+      - key: DEEPSEEK_API_KEY
+        sync: false

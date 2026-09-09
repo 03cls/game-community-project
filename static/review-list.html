@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>评测攻略 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="css/style.css?v=proto12">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="wrap page">
+  <div style="margin-bottom:16px;">
+    <button class="btn back-btn" onclick="goBack()">← 返回</button>
+  </div>
+
+  <!-- 游戏简略信息 -->
+  <div id="gameBrief"><div class="loading">⏳ 加载中…</div></div>
+
+  <!-- 评测攻略列表 -->
+  <h3 class="section-title">📝 全部评测攻略 <span class="dim" id="totalText" style="font-size:13px; font-weight:400;"></span></h3>
+  <div class="card" style="padding:18px 22px;">
+    <div class="flex" style="gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+      <input class="input" id="rwKw" placeholder="搜索本游戏的评测（标题 / 正文关键词）…" style="max-width:320px;">
+      <button class="btn btn-primary" onclick="searchReviews()">🔍 搜索</button>
+      <button class="btn" onclick="resetSearch()">重置</button>
+    </div>
+    <div id="reviewList"><div class="loading">⏳ 加载中…</div></div>
+    <div id="pageSlot"></div>
+  </div>
+</div>
+
+<div id="footerSlot"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
+<script>
+Auth.mountNav('games');
+document.getElementById('footerSlot').innerHTML = U.footer();
+
+var gid = parseInt(U.qs('game_id'), 10) || 0;
+var rwState = { keyword: '' };
+
+/* 返回：智能返回（同标签页→history.back，新标签页→referrer，兜底→游戏详情） */
+window.goBack = function () {
+  U.goBack(gid ? 'game-detail.html?id=' + gid : 'game-list.html');
+};
+
+/* 本游戏评测搜索筛选 */
+window.searchReviews = function () {
+  rwState.keyword = document.getElementById('rwKw').value.trim();
+  loadReviews(1);
+};
+window.resetSearch = function () {
+  document.getElementById('rwKw').value = '';
+  rwState.keyword = '';
+  loadReviews(1);
+};
+document.getElementById('rwKw').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') window.searchReviews();
+});
+
+/* 富文本摘要：去标签取前 N 字 */
+function excerpt(html, n) {
+  var div = document.createElement('div');
+  div.innerHTML = html || '';
+  var text = (div.textContent || '').replace(/\s+/g, ' ').trim();
+  return text.length > n ? text.slice(0, n) + '…' : (text || '（暂无正文）');
+}
+
+/* 四维评分迷你展示 */
+function dimScores(r) {
+  var items = [['剧情', r.score_story], ['画面', r.score_graphic], ['玩法', r.score_gameplay], ['优化', r.score_opt]];
+  return '<div class="dim" style="font-size:11px; display:flex; gap:10px; flex-wrap:wrap;">'
+    + items.map(function (it) {
+        return it[1] == null ? '' : '<span>' + it[0] + ' <b style="color:var(--accent-2);">' + it[1] + '</b>/10</span>';
+      }).join('')
+    + '</div>';
+}
+
+async function init() {
+  if (!gid) {
+    document.getElementById('gameBrief').innerHTML = '<div class="empty"><div class="icon">❓</div>缺少 game_id 参数</div>';
+    document.getElementById('reviewList').innerHTML = '';
+    return;
+  }
+  /* 游戏简略信息 */
+  try {
+    var g = await Api.get('/games/' + gid);
+    document.getElementById('gameBrief').innerHTML =
+      '<div class="card" style="display:flex; gap:20px; align-items:center; padding:18px 22px; margin-bottom:20px;">'
+      + '<img src="' + U.esc(g.cover_url) + '" style="width:220px; aspect-ratio:16/9; object-fit:cover; border-radius:10px; flex-shrink:0;" onerror="coverError(this)">'
+      + '<div style="flex:1; min-width:0;">'
+      + '<h2 style="font-size:20px;">' + U.esc(g.name) + ' <span class="dim" style="font-size:13px; font-weight:400;">' + U.esc(g.name_en || '') + '</span></h2>'
+      + '<div class="stat-inline" style="margin:6px 0;">'
+      + '<span>📂 ' + U.esc(g.category_name || '-') + '</span>'
+      + '<span>🏢 ' + U.esc(g.developer || '未知') + '</span>'
+      + '<span class="score" style="font-size:16px;">★ ' + Number(g.average_score || 0).toFixed(1) + '</span>'
+      + '<span class="dim">' + (g.rating_count ? g.rating_count + ' 人参与评分' : '') + '</span>'
+      + '</div>'
+      + (g.tags || []).slice(0, 5).map(function (t) { return '<span class="tag">' + U.esc(t) + '</span>'; }).join('')
+      + '</div>'
+      + '<a class="btn" href="game-detail.html?id=' + g.id + '">游戏详情 →</a>'
+      + '</div>';
+  } catch (e) {
+    document.getElementById('gameBrief').innerHTML = '<div class="empty"><div class="icon">❓</div>' + U.esc(e.message) + '</div>';
+    return;
+  }
+  loadReviews(1);
+}
+
+async function loadReviews(page) {
+  var list = document.getElementById('reviewList');
+  var data;
+  try {
+    data = await Api.get('/games/' + gid + '/reviews?page=' + page + '&page_size=10'
+      + (rwState.keyword ? '&keyword=' + encodeURIComponent(rwState.keyword) : ''));
+  } catch (e) {
+    list.innerHTML = '<div class="empty">' + U.esc(e.message) + '</div>';
+    return;
+  }
+  document.getElementById('totalText').textContent = '（共 ' + data.total + ' 篇'
+    + (rwState.keyword ? ' · 关键词「' + rwState.keyword + '」' : '') + '）';
+  if (!data.items.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">📭</div>'
+      + (rwState.keyword ? '没有匹配的评测，换个关键词试试～' : '这款游戏还没有公开的评测攻略，成为创作者来写第一篇吧！')
+      + '</div>';
+    document.getElementById('pageSlot').innerHTML = '';
+    return;
+  }
+  list.innerHTML = data.items.map(function (r) {
+    return '<div class="review-card" onclick="location.href=\'review-detail.html?review_id=' + r.id + '\'">'
+      + '<div class="review-head"><span class="review-title">' + U.esc(r.title)
+      + (r.is_featured ? ' <span class="featured-flag">⭐ 精选</span>' : '') + '</span></div>'
+      + '<div class="review-meta">✍️ ' + U.esc(r.author_name)
+      + (r.author_level != null ? ' ' + Auth.levelBadge(r.author_level, { short: true, icon: false }) : '')
+      + ' · 👁 ' + U.fmtNum(r.read_count) + ' 阅读 · ❤ ' + U.fmtNum(r.like_count) + ' 点赞 · ⭐ 收藏 ' + U.fmtNum(r.fav_count) + ' · ' + U.fmtDate(r.created_at) + '</div>'
+      + '<div style="margin:8px 0;">' + dimScores(r) + '</div>'
+      + '<p class="muted" style="font-size:13px; line-height:1.7;">' + U.esc(excerpt(r.content, 110)) + '</p>'
+      + '<div style="margin-top:8px;"><span class="dim" style="font-size:12px; color:var(--accent-2);">阅读全文 →</span></div>'
+      + '</div>';
+  }).join('');
+  document.getElementById('pageSlot').innerHTML = U.pagination(data.total_pages, data.page, loadReviews);
+}
+
+init();
+</script>
+</body>
+</html>

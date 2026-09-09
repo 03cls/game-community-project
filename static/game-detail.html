@@ -2,84 +2,431 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>游戏详情 — AI 游戏社区评测分享平台</title>
-<link rel="stylesheet" href="css/style.css">
+<title>游戏详情 — GameReview AI</title>
+<link rel="stylesheet" href="css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
 
 <div class="wrap page">
+  <nav class="crumbs" id="crumbs">
+    <a href="javascript:void(0)" onclick="goBack()">‹ 返回</a>
+    <span class="sep">|</span>
+    <a href="game-list.html">游戏库</a>
+    <span class="sep">/</span>
+    <span class="here">加载中…</span>
+  </nav>
   <div id="detail"><div class="loading">⏳ 加载中…</div></div>
 </div>
 
 <div id="footerSlot"></div>
 
+<!-- 灯箱 -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="图片预览">
+  <button class="lb-btn lb-close" id="lbClose" aria-label="关闭">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+  <button class="lb-btn" id="lbPrev" aria-label="上一张">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+  </button>
+  <figure style="display:grid; justify-items:center; gap:12px; margin:0;">
+    <img id="lbImg" src="" alt="大图预览">
+    <figcaption class="lb-cap" id="lbCap"></figcaption>
+  </figure>
+  <button class="lb-btn" id="lbNext" aria-label="下一张">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </button>
+</div>
+
 <script src="js/mock.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
 <script>
 Auth.mountNav('games');
 document.getElementById('footerSlot').innerHTML = U.footer();
 
 var gid = parseInt(U.qs('id'), 10) || 1;
-var game = null, commentCache = {};
+var game = null;
+var STEAM = null;          /* static/data/steam_data.json：{appid: {price_final, is_free, discount, screenshots[]}} */
+var steamItem = null;      /* 当前游戏在 STEAM 里的条目 */
+var lastComments = null;   /* 最近一次短评接口数据（重渲染时复用） */
+var myDims = null;         /* 我的四维评分选择 {score_story..} */
+var myCommentDraft = '';   /* 评分短评草稿（重渲染时保留） */
+var LB = [];               /* 灯箱图源 */
+var SHOTS = [];            /* Steam 官方截图（与封面不同的实机图） */
+
+var STAR_SVG = '<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4l-5.2 2.7 1-5.8L3.5 9.2l5.9-.9L12 3z"/></svg>';
+var DIM_LABELS = [['score_story', '剧情'], ['score_graphic', '画面'], ['score_gameplay', '玩法'], ['score_opt', '优化']];
+
+/* ===== 返回：智能返回（同标签页→history.back，新标签页→referrer，兜底→游戏库） ===== */
+window.goBack = function () {
+  U.goBack('game-list.html');
+};
 
 async function init() {
+  try {
+    var r = await fetch('data/steam_data.json');
+    if (r.ok) STEAM = await r.json();
+  } catch (e) { /* 获取失败时降级为衍生图源 */ }
   try {
     game = await Api.get('/games/' + gid);
   } catch (e) {
     document.getElementById('detail').innerHTML = '<div class="empty"><div class="icon">❓</div>' + U.esc(e.message) + '</div>';
     return;
   }
+  steamItem = (STEAM && steamAppid() && STEAM[steamAppid()]) || null;
+  buildAssets();
   renderDetail();
-  loadReviews();
+  loadSimilar();
+  loadReviewsCount();
+  loadGameComments(1);
 }
 
+/* ===== Steam appid：优先 steam_url，其次 cover_url ===== */
+function steamAppid() {
+  var m = /app\/(\d+)/.exec(game.steam_url || '') || /apps\/(\d+)\//.exec(game.cover_url || '');
+  return m ? m[1] : '';
+}
+function steamAssetUrl(appid, file) {
+  return 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + appid + '/' + file;
+}
+
+/* ===== 图源与截图：0=封面立绘 1=商店主图 2=胶囊横幅 3=资料库头图，其后为 Steam 官方实机截图 ===== */
+function buildAssets() {
+  var appid = steamAppid();
+  if (appid) {
+    LB = [
+      { src: steamAssetUrl(appid, 'library_600x900.jpg'), cap: game.name + ' · 封面立绘' },
+      { src: steamAssetUrl(appid, 'header.jpg'), cap: game.name + ' · 商店主图' },
+      { src: steamAssetUrl(appid, 'capsule_616x353.jpg'), cap: game.name + ' · 胶囊横幅' },
+      { src: steamAssetUrl(appid, 'library_hero.jpg'), cap: game.name + ' · 资料库头图' }
+    ];
+  } else {
+    LB = [{ src: game.cover_url, cap: game.name + ' · 游戏封面' }];
+  }
+  SHOTS = (steamItem && steamItem.screenshots) || [];
+  SHOTS.forEach(function (s, i) {
+    LB.push({ src: s, cap: game.name + ' · 游戏截图 ' + (i + 1) });
+  });
+}
+
+/* ===== 四维雷达图（剧情/画面/玩法/优化，0-10 分，琥珀金主题） ===== */
+function radarSvg(s) {
+  var cx = 90, cy = 90, R = 62;
+  function pt(i, v) {
+    var ang = -Math.PI / 2 + i * Math.PI / 2;
+    var r = (Math.max(0, Math.min(10, v)) / 10) * R;
+    return (cx + r * Math.cos(ang)).toFixed(1) + ',' + (cy + r * Math.sin(ang)).toFixed(1);
+  }
+  var vals = [s.score_story, s.score_graphic, s.score_gameplay, s.score_opt];
+  var grid = '';
+  [2.5, 5, 7.5, 10].forEach(function (lv) {
+    var p = [];
+    for (var i = 0; i < 4; i++) {
+      var ang = -Math.PI / 2 + i * Math.PI / 2, r = lv / 10 * R;
+      p.push((cx + r * Math.cos(ang)).toFixed(1) + ',' + (cy + r * Math.sin(ang)).toFixed(1));
+    }
+    grid += '<polygon points="' + p.join(' ') + '" fill="' + (lv === 10 ? 'rgba(232,163,61,0.05)' : 'none') + '" stroke="#26314a" stroke-width="1"/>';
+  });
+  var axes = '';
+  for (var i = 0; i < 4; i++) axes += '<line x1="' + cx + '" y1="' + cy + '" x2="' + pt(i, 10).split(',')[0] + '" y2="' + pt(i, 10).split(',')[1] + '" stroke="#26314a" stroke-width="1"/>';
+  var labels = [['剧情', 0, -12], ['画面', 12, 4], ['玩法', 0, 18], ['优化', -12, 4]].map(function (L, i) {
+    var p = pt(i, 10).split(',');
+    return '<text x="' + (parseFloat(p[0]) + L[1]) + '" y="' + (parseFloat(p[1]) + L[2]) + '" fill="#98A2B3" font-size="11" text-anchor="middle">' + L[0] + ' ' + Number(vals[i]).toFixed(1) + '</text>';
+  }).join('');
+  var data = '<polygon points="' + vals.map(function (v, i) { return pt(i, v); }).join(' ')
+    + '" fill="rgba(232,163,61,.28)" stroke="#E8A33D" stroke-width="1.8" stroke-linejoin="round"/>';
+  var dots = vals.map(function (v, i) { var p = pt(i, v).split(','); return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#0B0E14" stroke="#E8A33D" stroke-width="1.6"/>'; }).join('');
+  return '<svg viewBox="0 0 180 180">' + grid + axes + data + dots + labels + '</svg>';
+}
+
+function dimsHtml(s) {
+  return [['剧情', s.score_story], ['画面', s.score_graphic], ['玩法', s.score_gameplay], ['优化', s.score_opt]]
+    .map(function (d) { return '<span class="dim-chip">' + d[0] + '<b>' + (d[1] ? Number(d[1]).toFixed(1) : '—') + '</b></span>'; }).join('');
+}
+
+/* ===== 简介展开块 ===== */
+function descBlock(text) {
+  if (!text) return '';
+  return '<div class="desc" id="desc"><p>' + U.esc(text) + '</p>'
+    + '<button class="desc-btn" id="descBtn" aria-expanded="false"><span id="descBtnText">展开完整介绍</span>'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+    + '</button></div>';
+}
+
+/* ===== Steam 价格卡（售价 / 折扣 / 购买入口） ===== */
+function priceCardHtml() {
+  if (!game.steam_url) return '';
+  if (!steamItem || (!steamItem.is_free && !steamItem.price_final)) {
+    /* 无价格数据时降级：仅购买按钮行 */
+    return '<div class="price-card price-none"><span class="price-tag">Steam 商店在售</span>'
+      + '<a class="btn btn-solid" href="' + U.esc(game.steam_url) + '" target="_blank" rel="noopener noreferrer">🛒 前往 Steam 购买 ↗</a></div>';
+  }
+  var left;
+  if (steamItem.is_free) {
+    left = '<div class="price-now price-free">免费游玩</div>';
+  } else {
+    var disc = steamItem.discount || 0;
+    left = '<div class="price-now">' + U.esc(steamItem.price_final)
+      + (disc > 0 && steamItem.price_initial ? '<span class="price-orig">' + U.esc(steamItem.price_initial) + '</span>' : '')
+      + '</div>';
+  }
+  var badge = steamItem.discount > 0 ? '<span class="price-off">-' + steamItem.discount + '%</span>' : '';
+  return '<div class="price-card">'
+    + '<div class="price-left"><div class="price-tag">Steam 市价 ' + badge + '</div>' + left + '</div>'
+    + '<a class="btn btn-solid" href="' + U.esc(game.steam_url) + '" target="_blank" rel="noopener noreferrer">🛒 前往 Steam 购买 ↗</a>'
+    + '</div>';
+}
+
+/* ===== 截图小网格（填充信息列下方，点击开灯箱） ===== */
+function shotGridHtml() {
+  if (!SHOTS.length) return '';
+  return '<div class="shots-block"><div class="shots-head">📸 游戏截图 <span class="dim">来自 Steam 商店 · 点击查看大图</span></div>'
+    + '<div class="shot-grid">' + SHOTS.map(function (s, i) {
+        var lbIdx = 4 + i;
+        return '<figure class="shot-item" data-lb-open="' + lbIdx + '" title="点击查看大图">'
+          + '<img src="' + U.esc(s.replace('.1920x1080.jpg', '.600x338.jpg')) + '" alt="' + U.esc(game.name) + ' 截图 ' + (i + 1) + '" loading="lazy" '
+          + 'onerror="this.onerror=null;this.src=\'' + U.esc(s) + '\'">'
+          + '</figure>';
+      }).join('') + '</div></div>';
+}
+
+/* ===== 页面渲染（原型三栏：封面 / 信息 / 评分栏） ===== */
 function renderDetail() {
   var g = game;
   var u = Auth.user();
-  var tags = g.tags.map(function (t) { return '<span class="tag">' + U.esc(t) + '</span>'; }).join('');
-  var html = '';
-  html += '<div class="card" style="display:flex; gap:24px; margin-bottom:20px;">'
-    + '<img src="' + U.esc(g.cover_url) + '" style="width:300px; aspect-ratio:16/9; object-fit:cover; border-radius:10px; flex-shrink:0;">'
-    + '<div style="flex:1; min-width:0;">'
-    + '<h2 style="font-size:24px;">' + U.esc(g.name) + ' <span class="dim" style="font-size:14px; font-weight:400;">' + U.esc(g.name_en) + '</span></h2>'
-    + '<div class="stat-inline" style="margin:8px 0;">'
-    + '<span>📂 ' + U.esc(g.category_name) + '</span>'
-    + '<span>🏢 ' + U.esc(g.developer || '未知') + '</span>'
-    + '<span>📅 ' + U.fmtDate(g.release_date) + '</span>'
-    + '<span class="score" style="font-size:18px;">★ ' + g.average_score.toFixed(1) + '</span></div>'
-    + '<div style="margin:8px 0;">' + tags + '</div>'
-    + '<p class="muted" style="margin:10px 0; line-height:1.8;">' + U.esc(g.description) + '</p>'
-    + '<div class="flex" style="margin-top:14px; flex-wrap:wrap;">'
-    + '<button class="btn ' + (g.is_favorite ? '' : 'btn-primary') + '" id="favBtn">' + (g.is_favorite ? '★ 已收藏（点击取消）' : '☆ 收藏游戏') + '</button>'
-    + '<span class="dim">游玩标记：</span>'
+  var appid = steamAppid();
+
+  /* 面包屑：‹ 返回 / 游戏库 / 分类 / 当前游戏 */
+  var crumb = '<a href="javascript:void(0)" onclick="goBack()">‹ 返回</a><span class="sep">/</span>'
+    + '<a href="game-list.html">游戏库</a>';
+  if (g.category_name) {
+    var catId = g.category_id ? ('?category_id=' + g.category_id) : '';
+    crumb += '<span class="sep">/</span><a href="game-list.html' + catId + '">' + U.esc(g.category_name) + '</a>';
+  }
+  crumb += '<span class="sep">/</span><span class="here">' + U.esc(g.name) + '</span>';
+  document.getElementById('crumbs').innerHTML = crumb;
+
+  var tags = (g.tags || []).map(function (t, i) {
+    return '<span class="tag' + (i === 0 ? ' gold' : '') + '">' + U.esc(t) + '</span>';
+  }).join('');
+
+  /* 封面缩略图条：优先官方实机截图（与封面区分），无截图时退回 Steam 衍生图 */
+  var thumbs = SHOTS.length ? SHOTS.slice(0, 4).map(function (s, i) {
+    return '<button data-lb-open="' + (4 + i) + '" title="游戏截图 ' + (i + 1) + '"><img src="' + U.esc(s.replace('.1920x1080.jpg', '.600x338.jpg')) + '" alt="截图' + (i + 1) + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + U.esc(s) + '\'"></button>';
+  }).join('') : (appid ? LB.slice(1, 5).map(function (a, i) {
+    return '<button data-lb-open="' + (i + 1) + '" title="' + U.esc(a.cap) + '"><img src="' + U.esc(a.src) + '" alt="' + U.esc(a.cap) + '" loading="lazy" onerror="coverError(this)"></button>';
+  }).join('') : '');
+
+  var html = '<section class="detail-hero">'
+
+    /* 左：封面 + 缩略图 */
+    + '<div class="gd-cover-wrap">'
+    + '<figure class="gd-cover" data-lb-open="0" title="点击查看大图">'
+    + '<img src="' + U.esc(LB[0].src) + '" alt="' + U.esc(g.name) + '" onerror="coverError(this)">'
+    + '<span class="gd-hint"><span>⤢ 查看大图</span></span>'
+    + '<span class="gd-badge">★ ' + Number(g.average_score || 0).toFixed(1) + ' · ' + U.esc(g.category_name || '游戏') + '</span>'
+    + '</figure>'
+    + (thumbs ? '<div class="gd-thumbs">' + thumbs + '</div>' : '')
+    + '</div>'
+
+    /* 中：信息 */
+    + '<div class="info-col">'
+    + '<h1>' + U.esc(g.name) + '</h1>'
+    + '<p class="en-name">' + U.esc(g.name_en || '') + '</p>'
+    + '<div class="meta-grid">'
+    + '<span class="kv"><b>开发商</b>' + U.esc(g.developer || '未知') + '</span>'
+    + '<span class="kv"><b>发行时间</b>' + U.fmtDate(g.release_date) + '</span>'
+    + '<span class="kv"><b>分类</b>' + U.esc(g.category_name || '-') + '</span>'
+    + '</div>'
+    + '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">' + (tags || '<span class="dim">暂无标签</span>') + '</div>'
+    + descBlock(g.description)
+    + priceCardHtml()
+    + '<div class="detail-actions">'
+    + '<button class="btn btn-fav' + (g.is_favorite ? ' faved' : '') + '" id="favBtn">'
+    + '<svg width="16" height="16" viewBox="0 0 24 24" fill="' + (g.is_favorite ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4l-5.2 2.7 1-5.8L3.5 9.2l5.9-.9L12 3z"/></svg>'
+    + '<span id="favText">' + (g.is_favorite ? '已收藏' : '收藏游戏') + '</span></button>'
+    + '<span class="status-group"><span class="status-label">打卡：</span>'
     + ['want', 'playing', 'completed'].map(function (s) {
         var map = { want: '想玩', playing: '正在玩', completed: '已通关' };
-        return '<button class="btn btn-sm play-btn ' + (g.play_status === s ? 'btn-primary' : '') + '" data-s="' + s + '">' + map[s] + '</button>';
+        return '<button class="status-pill play-btn ' + (g.play_status === s ? 'active' : '') + '" data-s="' + s + '">' + map[s] + '</button>';
       }).join('')
+    + '</span>'
+    + (u ? '' : '<span class="dim" style="font-size:12px;">⚠️ 收藏与打卡需先 <a href="login.html" style="color:var(--accent-2)">登录</a></span>')
     + '</div>'
-    + (u ? '' : '<p class="dim" style="margin-top:8px;">⚠️ 收藏与游玩标记需要先 <a href="login.html" style="color:var(--accent-2)">登录</a></p>')
-    + '</div></div>';
+    + '<div class="detail-actions">'
+    + '<button class="btn btn-ghost" id="allReviewsBtn">📝 评测攻略<span id="reviewCountText"></span></button>'
+    + '<button class="btn btn-share" id="shareBtn">分享链接</button>'
+    + '</div>'
+    + '<div class="community-stats">'
+    + '<span><b id="stRating">' + (g.rating_count || 0) + '</b>人评分</span>'
+    + '<span><b id="stReview">-</b>评测攻略</span>'
+    + '<span><b id="stComment">-</b>游戏短评</span>'
+    + '</div>'
+    + shotGridHtml()
+    + '</div>'
 
-  html += '<div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px; align-items:start;"><div>'
-    + '<h3 class="section-title">📝 评测 / 攻略</h3><div id="reviewList"><div class="loading">加载中…</div></div>'
+    /* 右：评分栏 */
+    + '<aside class="score-col">'
+    + '<div class="panel">'
+    + '<div class="score-hero">'
+    + '<div class="score-num" id="aggNum">' + Number(g.average_score || 0).toFixed(1) + '<small>/10</small></div>'
+    + '<div class="score-sub">综合总评分<br><b id="aggCount">' + (g.rating_count || 0) + '</b> 人参与评分</div>'
     + '</div>'
-    + '<div>'
-    + '<div class="ai-panel" style="margin-bottom:16px;"><div class="ai-title">🤖 找类似游戏？</div>'
-    + '<p class="muted" style="font-size:13px; margin-bottom:10px;">AI 根据你的口味推荐相似作品</p>'
-    + '<button class="btn btn-primary btn-block" id="similarBtn">获取 AI 相似推荐</button>'
-    + '<div id="similarBox" style="margin-top:12px;"></div></div>'
-    + '<div class="card"><b>游戏数据</b><div class="stat-inline" style="flex-direction:column; align-items:flex-start; gap:6px; margin-top:10px;">'
-    + '<span>综合评分：<span class="score">' + g.average_score.toFixed(1) + '</span></span>'
-    + '<span>开发商：' + U.esc(g.developer || '-') + '</span>'
-    + '<span>发售日：' + U.fmtDate(g.release_date) + '</span>'
-    + '</div></div>'
-    + '</div></div>';
+    + '<div class="radar-wrap" id="radarWrap">' + radarSvg(g) + '</div>'
+    + '<div class="dims" id="dimsWrap">' + dimsHtml(g) + '</div>'
+    + '</div>'
+    + '<div class="panel"><h3>我的评分</h3><div class="my-score" id="rateBox"></div></div>'
+    + '</aside>'
+    + '</section>';
+
+  /* 评测攻略 */
+  html += '<section style="margin-top:36px;">'
+    + '<div class="section-head"><h2>📝 评测攻略</h2>'
+    + '<button class="more" id="allReviewsBtn2">查看全部<span id="reviewCountText2"></span>'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
+    + '</button></div></section>';
+
+  /* 游戏短评论区 */
+  html += '<section style="margin-top:32px;">'
+    + '<div class="section-head"><h2>💬 游戏短评论区</h2></div>'
+    + '<div class="card"><div id="gameComments">'
+    + (lastComments ? '' : '<div class="loading">加载中…</div>')
+    + '</div></div></section>';
 
   document.getElementById('detail').innerHTML = html;
   bindActions();
+  bindMisc();
+  renderMyScore();
+  if (lastComments) renderGameComments(lastComments);
+}
+
+/* ===== 简介展开 / 分享 ===== */
+function bindMisc() {
+  var d = document.getElementById('desc');
+  if (d) {
+    document.getElementById('descBtn').onclick = function () {
+      var open = d.classList.toggle('open');
+      this.setAttribute('aria-expanded', String(open));
+      document.getElementById('descBtnText').textContent = open ? '收起介绍' : '展开完整介绍';
+    };
+  }
+  var sb = document.getElementById('shareBtn');
+  if (sb) sb.onclick = function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(location.href).then(function () {
+        U.toast('详情页链接已复制，快分享给好友吧', 'success');
+      }, function () { U.toast('已生成分享链接', 'info'); });
+    } else U.toast('已生成分享链接', 'info');
+  };
+}
+
+/* ===== 我的评分：剧情 / 画面 / 玩法 / 优化 四维打分（1-10），可附一句短评 ===== */
+function defaultDims() {
+  var d = {};
+  DIM_LABELS.forEach(function (x) { d[x[0]] = 5; });
+  return d;
+}
+function compositeOf(d) {
+  var sum = 0;
+  DIM_LABELS.forEach(function (x) { sum += d[x[0]]; });
+  return Math.max(1, Math.min(10, Math.round(sum / 4)));
+}
+
+function renderMyScore() {
+  var box = document.getElementById('rateBox');
+  if (!box) return;
+  var u = Auth.user();
+  if (!u) {
+    box.innerHTML = '<div class="dim">⚠️ <a href="login.html" style="color:var(--accent-2);">登录</a>后可从剧情 / 画面 / 玩法 / 优化四个维度打分</div>';
+    return;
+  }
+  if (!myDims) {
+    myDims = defaultDims();
+    if (game.my_dims) {
+      DIM_LABELS.forEach(function (x) {
+        var v = game.my_dims[x[0]];
+        if (v !== null && v !== undefined) myDims[x[0]] = v;
+      });
+    } else if (game.my_rating) {
+      DIM_LABELS.forEach(function (x) { myDims[x[0]] = game.my_rating; });
+    }
+  }
+  var rows = DIM_LABELS.map(function (x) {
+    return '<div class="dim-rate-row"><span class="dim-rate-label">' + x[1] + '</span>'
+      + '<input type="range" min="1" max="10" step="1" value="' + myDims[x[0]] + '" data-dim="' + x[0] + '">'
+      + '<b class="dim-rate-val" id="val_' + x[0] + '">' + myDims[x[0]] + '</b></div>';
+  }).join('');
+  box.innerHTML = rows
+    + '<div class="my-composite">综合 <b id="compositeNum">' + compositeOf(myDims) + '</b> / 10 <span class="dim">（四维均分，提交后实时同步到评论区）</span></div>'
+    + '<div class="my-comment">'
+    + '<input id="myComment" type="text" maxlength="100" placeholder="写一句短评（选填，随评分发布）" value="' + U.esc(myCommentDraft) + '">'
+    + '<button class="btn-submit" id="rateBtn">' + (game.my_rating ? '更新评分' : '提交评分') + '</button>'
+    + '</div>';
+  box.querySelectorAll('input[type=range]').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      myDims[inp.dataset.dim] = parseInt(inp.value, 10);
+      document.getElementById('val_' + inp.dataset.dim).textContent = inp.value;
+      document.getElementById('compositeNum').textContent = compositeOf(myDims);
+    });
+  });
+  document.getElementById('myComment').addEventListener('input', function () { myCommentDraft = this.value; });
+  document.getElementById('myComment').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitRating(); });
+  document.getElementById('rateBtn').onclick = submitRating;
+}
+
+window.submitRating = async function () {
+  if (!Auth.requireLogin()) return;
+  var cmtEl = document.getElementById('myComment');
+  var cmt = cmtEl ? cmtEl.value.trim() : '';
+  try {
+    var res = await Api.post('/games/' + gid + '/rating', {
+      score_story: myDims.score_story,
+      score_graphic: myDims.score_graphic,
+      score_gameplay: myDims.score_gameplay,
+      score_opt: myDims.score_opt
+    });
+    game.my_rating = res.my_rating;
+    game.my_dims = res.my_dims;
+    game.average_score = res.average_score;
+    game.rating_count = res.rating_count;
+    game.score_story = res.score_story;
+    game.score_graphic = res.score_graphic;
+    game.score_gameplay = res.score_gameplay;
+    game.score_opt = res.score_opt;
+    U.toast('评分成功：综合 ' + res.my_rating + ' 分', 'success');
+    myCommentDraft = '';
+    renderAgg();
+    renderScorePanel();
+    renderMyScore();
+    if (cmt) {
+      try {
+        await Api.post('/games/' + gid + '/comments', { content: cmt });
+        U.toast('短评已同步发布', 'success');
+      } catch (e2) { U.toast('短评发布失败：' + e2.message, 'error'); }
+    }
+    /* 实时：评论区里自己的短评带上最新综合评分 */
+    loadGameComments(1);
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+function renderAgg() {
+  var num = document.getElementById('aggNum');
+  if (num) num.innerHTML = Number(game.average_score || 0).toFixed(1) + '<small>/10</small>';
+  var cnt = document.getElementById('aggCount');
+  if (cnt) cnt.textContent = String(game.rating_count || 0);
+  var st = document.getElementById('stRating');
+  if (st) st.textContent = String(game.rating_count || 0);
+}
+
+function renderScorePanel() {
+  var rw = document.getElementById('radarWrap');
+  if (rw) rw.innerHTML = radarSvg(game);
+  var dw = document.getElementById('dimsWrap');
+  if (dw) dw.innerHTML = dimsHtml(game);
+  var badge = document.querySelector('.gd-badge');
+  if (badge) badge.innerHTML = '★ ' + Number(game.average_score || 0).toFixed(1) + ' · ' + U.esc(game.category_name || '游戏');
 }
 
 function bindActions() {
@@ -102,146 +449,236 @@ function bindActions() {
       try {
         await Api.post('/play-record', { game_id: gid, play_status: btn.dataset.s });
         game.play_status = btn.dataset.s;
-        U.toast('游玩状态已更新', 'success');
+        U.toast('打卡成功：' + { want: '想玩', playing: '正在玩', completed: '已通关' }[btn.dataset.s], 'success');
         renderDetail();
       } catch (e) { U.toast(e.message, 'error'); }
     };
   });
-  document.getElementById('similarBtn').onclick = aiSimilar;
+  var goReviews = function () { location.href = 'review-list.html?game_id=' + gid; };
+  var b1 = document.getElementById('allReviewsBtn');
+  if (b1) b1.onclick = goReviews;
+  var b2 = document.getElementById('allReviewsBtn2');
+  if (b2) b2.onclick = goReviews;
 }
 
-async function loadReviews() {
-  var data = await Api.get('/games/' + gid + '/reviews?page=1');
-  var list = document.getElementById('reviewList');
-  if (!data.items.length) {
-    list.innerHTML = '<div class="empty"><div class="icon">📭</div>这款游戏还没有评测攻略，成为创作者来写第一篇吧！</div>';
+/* ===== 相似游戏推荐：GET /games/{id}/similar，空则整块隐藏 ===== */
+async function loadSimilar() {
+  try {
+    var data = await Api.get('/games/' + gid + '/similar');
+    if (!data.items || !data.items.length) return;
+    var sec = document.createElement('section');
+    sec.style.marginTop = '40px';
+    sec.innerHTML = '<div class="section-head"><h2>🎯 相似游戏推荐</h2></div>'
+      + '<div class="similar-grid">' + data.items.map(function (s) {
+        return '<div class="sim-card" onclick="location.href=\'game-detail.html?id=' + s.id + '\'">'
+          + '<span class="sim-cover"><img src="' + U.esc(s.cover_url) + '" alt="' + U.esc(s.name) + '" loading="lazy" onerror="coverError(this)">'
+          + '<span class="sim-score">★ ' + Number(s.average_score).toFixed(1) + '</span></span>'
+          + '<span class="sim-info" style="display:block;"><h4>' + U.esc(s.name) + '</h4>'
+          + '<span class="sim-meta"><span class="type">' + U.esc(s.category_name || '') + '</span>'
+          + '<span>' + (s.rating_count ? s.rating_count + ' 人评分' : '暂无评分') + '</span></span></span></div>';
+      }).join('') + '</div>';
+    var commentsSec = document.getElementById('gameComments').closest('section');
+    commentsSec.parentNode.insertBefore(sec, commentsSec);
+  } catch (e) { /* 无数据时静默隐藏 */ }
+}
+
+/* ===== 评测攻略总数：GET /games/{id}/reviews/count ===== */
+async function loadReviewsCount() {
+  var el = document.getElementById('reviewCountText');
+  try {
+    var data = await Api.get('/games/' + gid + '/reviews/count');
+    el.textContent = '（共 ' + data.count + ' 篇）';
+    var el2 = document.getElementById('reviewCountText2');
+    if (el2) el2.textContent = '（共 ' + data.count + ' 篇）';
+    var st = document.getElementById('stReview');
+    if (st) st.textContent = String(data.count);
+  } catch (e) {
+    el.textContent = '';
+  }
+}
+
+/* ===== 游戏短评论区（自动精选 + 普通分页 + 点赞 + 评分徽标） ===== */
+var gcState = { page: 1, totalPages: 1, total: 0 };
+
+async function loadGameComments(page) {
+  var box = document.getElementById('gameComments');
+  if (!box) return;
+  try {
+    var data = await Api.get('/games/' + gid + '/comments?page=' + page);
+  } catch (e) {
+    box.innerHTML = '<div class="empty">' + U.esc(e.message) + '</div>';
     return;
   }
-  list.innerHTML = data.items.map(function (r) {
-    return '<div class="review-item" id="rv' + r.id + '"><div class="review-head"><span class="review-title">' + U.esc(r.title) + '</span></div>'
-      + '<div class="review-meta">✍️ ' + U.esc(r.author_name) + ' · 👁 ' + U.fmtNum(r.read_count) + ' · ❤ ' + U.fmtNum(r.like_count) + ' · ' + U.fmtDate(r.created_at) + '</div>'
-      + '<div class="review-content collapsed" id="rc' + r.id + '">' + r.content + '</div>'
-      + '<div class="flex" style="gap:10px; margin-top:6px;">'
-      + '<button class="btn btn-sm" onclick="toggleReview(' + r.id + ')" id="rb' + r.id + '">展开全文 ▾</button>'
-      + '<button class="btn btn-sm" onclick="toggleComments(' + r.id + ')" id="cb' + r.id + '">💬 评论加载中…</button>'
-      + '</div>'
-      + '<div id="comments-' + r.id + '" style="display:none; margin-top:10px;"></div>'
-      + '</div>';
-  }).join('');
-  /* 并行加载每篇评测的评论数 */
-  data.items.forEach(function (r) { loadReviewComments(r.id); });
+  gcState = { page: data.page, totalPages: data.total_pages, total: data.total };
+  lastComments = data;
+  var st = document.getElementById('stComment');
+  if (st) st.textContent = String(data.total);
+  renderGameComments(data);
 }
 
-window.toggleReview = function (id) {
-  var el = document.getElementById('rc' + id);
-  var btn = document.getElementById('rb' + id);
-  var collapsed = el.classList.toggle('collapsed');
-  btn.textContent = collapsed ? '展开全文 ▾' : '收起 ▴';
-};
-
-window.toggleComments = function (reviewId) {
-  var box = document.getElementById('comments-' + reviewId);
-  var btn = document.getElementById('cb' + reviewId);
-  if (box.style.display === 'none') {
-    box.style.display = 'block';
-    btn.textContent = '收起评论 ▴';
-  } else {
-    box.style.display = 'none';
-    btn.textContent = '💬 评论 (' + (commentCache[reviewId] ? commentCache[reviewId].length : 0) + ')';
+/* 评论者综合评分徽标（悬浮显示四维明细） */
+function scoreBadge(c) {
+  if (c.user_score === null || c.user_score === undefined) return '';
+  var t = '';
+  if (c.user_dims) {
+    t = DIM_LABELS.map(function (x, i) {
+      var v = [c.user_dims['剧情'], c.user_dims['画面'], c.user_dims['玩法'], c.user_dims['优化']][i];
+      return x[1] + ' ' + (v === null || v === undefined ? '-' : v);
+    }).join(' · ');
   }
-};
-
-async function loadReviewComments(reviewId) {
-  var data = await Api.get('/comments?target_type=review&target_id=' + reviewId);
-  commentCache[reviewId] = data.items;
-  var btn = document.getElementById('cb' + reviewId);
-  if (btn) btn.textContent = '💬 评论 (' + data.items.length + ')';
-  renderComments(reviewId);
+  return '<span class="cmt-score" title="' + U.esc(t) + '">★ ' + c.user_score + '</span>';
 }
 
-function renderComments(reviewId) {
-  var box = document.getElementById('comments-' + reviewId);
-  if (!box) return;
-  var list = commentCache[reviewId] || [];
-  var tops = list.filter(function (c) { return !c.parent_id; });
+function renderGameComments(data) {
   var u = Auth.user();
+  var box = document.getElementById('gameComments');
   var html = '';
-  /* 评论输入框 */
-  html += '<div class="card" style="background:var(--surface-2); padding:10px; margin-bottom:10px;">'
-    + '<textarea class="input" rows="2" id="cmtInput-' + reviewId + '" placeholder="' + (u ? '对这篇评测发表看法…' : '登录后可评论…') + '" ' + (u ? '' : 'disabled') + '></textarea>'
-    + '<div class="flex" style="justify-content:flex-end; margin-top:6px;"><button class="btn btn-primary btn-sm" onclick="postComment(' + reviewId + ')">发表评论</button></div></div>';
-  html += tops.length ? tops.map(function (c) { return commentHtml(c, false); }).join('') : '<div class="dim" style="padding:8px 0;">还没有评论，来抢沙发～</div>';
+
+  /* 发表框：未登录禁用 */
+  html += '<div style="background:var(--surface-2); border-radius:10px; padding:12px; margin-bottom:14px;">'
+    + '<textarea class="input" rows="2" id="gcInput" placeholder="' + (u ? '聊聊这款游戏的玩法、剧情、手感…（简短评论即可）' : '登录后可发表评论') + '" ' + (u ? '' : 'disabled') + '></textarea>'
+    + '<div class="flex" style="justify-content:space-between; margin-top:8px; align-items:center;">'
+    + '<span class="dim" style="font-size:12px;">' + (u ? '提示：在右侧「我的评分」打分后，你的评论会显示综合评分徽标' : '⚠️ 未登录仅可浏览，<a href="login.html" style="color:var(--accent-2);">去登录</a>') + '</span>'
+    + '<button class="btn btn-primary btn-sm" onclick="postGameComment()">发表评论</button></div></div>';
+
+  /* ✨ 自动精选评论：后端运行时计算，满足全部条件才返回，否则隐藏 */
+  if (data.auto_selected_comment) {
+    html += '<div class="featured-block">'
+      + '<div class="featured-title">🏅 自动精选评论 <span class="dim" style="font-weight:400; font-size:12px;">· 系统按点赞与内容质量自动选出</span></div>'
+      + gameCommentHtml(data.auto_selected_comment, null, true)
+      + '</div>';
+  }
+
+  /* 普通评论分页列表（只渲染顶层评论，回复在下方嵌套） */
+  var tops = data.items.filter(function (c) { return !c.parent_id; });
+  if (tops.length) {
+    html += tops.map(function (c) { return gameCommentHtml(c, data.items, false); }).join('');
+  } else {
+    html += '<div class="dim" style="padding:12px 0;">还没有普通评论，来抢沙发～</div>';
+  }
+
+  /* 分页（每页 5-10 条） */
+  if (data.total_pages > 1) {
+    html += '<div class="flex" style="justify-content:center; gap:10px; margin-top:16px;">'
+      + '<button class="btn btn-sm" ' + (data.page <= 1 ? 'disabled' : '') + ' onclick="gotoCommentPage(' + (data.page - 1) + ')">‹ 上一页</button>'
+      + '<span class="dim" style="line-height:32px; font-size:13px;">第 ' + data.page + ' / ' + data.total_pages + ' 页（普通评论共 ' + data.total + ' 条）</span>'
+      + '<button class="btn btn-sm" ' + (data.page >= data.total_pages ? 'disabled' : '') + ' onclick="gotoCommentPage(' + (data.page + 1) + ')">下一页 ›</button>'
+      + '</div>';
+  }
   box.innerHTML = html;
 }
 
-function commentHtml(c, isReply) {
-  var list = commentCache[c.target_id] || [];
-  var replies = list.filter(function (x) { return x.parent_id === c.id; });
-  return '<div class="comment' + (isReply ? ' reply' : '') + '">'
+function gameCommentHtml(c, all, featured) {
+  var u = Auth.user();
+  var replies = all ? all.filter(function (x) { return x.parent_id === c.id; }) : [];
+  var html = '<div class="comment' + (featured ? ' featured-comment' : '') + '">'
     + '<div class="flex" style="align-items:flex-start;">'
-    + Auth.avatarHtml({ username: c.author_name, profile: {} }, 28)
-    + '<div style="flex:1; min-width:0;"><b>' + U.esc(c.author_name) + '</b> <span class="dim">' + U.fmtDate(c.created_at) + '</span>'
+    + Auth.avatarHtml({ username: c.author_name, profile: {} }, 32)
+    + '<div style="flex:1; min-width:0;"><b>' + U.esc(c.author_name) + '</b> '
+    + scoreBadge(c)
+    + (featured ? '<span class="badge badge-gold">🏅 自动精选</span>' : '')
+    + '<span class="dim" style="margin-left:6px;">' + U.fmtDate(c.created_at) + '</span>'
     + '<div class="bubble">' + U.esc(c.content) + '</div>'
-    + '<div class="stat-inline" style="margin-top:6px; gap:12px;">'
-    + '<a class="dim" style="cursor:pointer;" onclick="likeComment(' + c.id + ',' + c.target_id + ')">❤ ' + c.like_count + '</a>'
-    + '<a class="dim" style="cursor:pointer;" onclick="showReply(' + c.id + ',' + c.target_id + ',\'' + U.esc(c.author_name) + '\')">回复</a>'
-    + '</div><div id="replyBox-' + c.id + '"></div></div></div>'
-    + replies.map(function (r) { return commentHtml(r, true); }).join('')
-    + '</div>';
+    + '<div class="stat-inline" style="margin-top:6px;">'
+    + '<a class="gc-like' + (c.liked ? ' liked' : '') + '" style="cursor:pointer;" onclick="likeGameComment(' + c.id + ')">'
+    + (c.liked ? '❤️' : '🤍') + ' ' + c.like_count + '</a>';
+  if (u) html += '<a style="cursor:pointer; margin-left:12px;" onclick="toggleGcReplyBox(' + c.id + ')">回复</a>';
+  if (c.can_delete) html += '<a style="cursor:pointer; margin-left:12px; color:var(--red);" onclick="deleteGameComment(' + c.id + ')">删除</a>';
+  html += '</div>';
+  if (u) {
+    html += '<div class="reply-box" id="gcReplyBox_' + c.id + '" style="display:none; margin:8px 0;">'
+      + '<textarea class="input" rows="2" id="gcReplyInput_' + c.id + '" placeholder="回复 ' + U.esc(c.author_name) + '…"></textarea>'
+      + '<div class="flex" style="justify-content:flex-end; margin-top:6px;">'
+      + '<button class="btn btn-primary btn-sm" onclick="postGcReply(' + c.id + ')">发送</button></div></div>';
+  }
+  html += '</div></div></div>';
+  html += replies.map(function (r) { return gameCommentHtml(r, all, true); }).join('');
+  return html;
 }
 
-window.showReply = function (cid, reviewId, name) {
-  if (!Auth.requireLogin()) return;
-  var slot = document.getElementById('replyBox-' + cid);
-  slot.innerHTML = '<div class="flex" style="margin-top:8px;"><input class="input" id="replyInput' + cid + '" placeholder="回复 ' + name + '…" style="flex:1;">'
-    + '<button class="btn btn-primary btn-sm" onclick="submitReply(' + cid + ',' + reviewId + ')">发送</button></div>';
-  document.getElementById('replyInput' + cid).focus();
+window.toggleGcReplyBox = function (cid) {
+  var box = document.getElementById('gcReplyBox_' + cid);
+  if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
 };
 
-window.submitReply = async function (cid, reviewId) {
-  var input = document.getElementById('replyInput' + cid);
+window.postGcReply = async function (parentId) {
+  if (!Auth.requireLogin()) return;
+  var input = document.getElementById('gcReplyInput_' + parentId);
   if (!input.value.trim()) { U.toast('回复内容不能为空', 'error'); return; }
   try {
-    await Api.post('/comments', { target_type: 'review', target_id: reviewId, parent_id: cid, content: input.value.trim() });
+    await Api.post('/comments', { target_type: 'game', target_id: gid, parent_id: parentId, content: input.value.trim() });
     U.toast('回复成功', 'success');
-    await loadReviewComments(reviewId);
-    document.getElementById('comments-' + reviewId).style.display = 'block';
+    await loadGameComments(gcState.page);
   } catch (e) { U.toast(e.message, 'error'); }
 };
 
-window.postComment = async function (reviewId) {
+window.deleteGameComment = async function (cid) {
+  if (!confirm('确定删除这条评论？')) return;
+  try {
+    await Api.del('/comments/' + cid);
+    U.toast('评论已删除', 'success');
+    await loadGameComments(gcState.page);
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+window.gotoCommentPage = function (p) {
+  loadGameComments(p);
+  document.getElementById('gameComments').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+window.postGameComment = async function () {
   if (!Auth.requireLogin()) return;
-  var input = document.getElementById('cmtInput-' + reviewId);
+  var input = document.getElementById('gcInput');
   if (!input.value.trim()) { U.toast('评论内容不能为空', 'error'); return; }
   try {
-    await Api.post('/comments', { target_type: 'review', target_id: reviewId, content: input.value.trim() });
+    await Api.post('/games/' + gid + '/comments', { content: input.value.trim() });
     U.toast('评论成功', 'success');
-    await loadReviewComments(reviewId);
+    await loadGameComments(1);  // 新评论按时间倒序进入第一页
   } catch (e) { U.toast(e.message, 'error'); }
 };
 
-window.likeComment = async function (cid, reviewId) {
+/* 点赞/取消点赞（幂等切换），完成后刷新以重算自动精选 */
+window.likeGameComment = async function (cid) {
   if (!Auth.requireLogin()) return;
   try {
     await Api.post('/comments/' + cid + '/like');
-    await loadReviewComments(reviewId);
+    await loadGameComments(gcState.page);
   } catch (e) { U.toast(e.message, 'error'); }
 };
 
-async function aiSimilar() {
-  if (!Auth.requireLogin()) return;
-  var box = document.getElementById('similarBox');
-  box.innerHTML = '<div class="loading">AI 分析中…</div>';
-  try {
-    var res = await Api.post('/ai/game-recommend', { preferences: game.tags.join(' ') });
-    box.innerHTML = res.recommendations.map(function (r) {
-      return '<div class="reco-card" onclick="location.href=\'game-detail.html?id=' + r.game_id + '\'">'
-        + '<img src="' + U.esc(r.cover_url) + '">'
-        + '<div style="min-width:0;"><b style="font-size:13px;">' + U.esc(r.game_name) + '</b>'
-        + '<p class="dim" style="font-size:11px; margin-top:4px; white-space:normal;">' + U.esc(r.reason) + '</p></div></div>';
-    }).join('');
-  } catch (e) { box.innerHTML = '<div class="dim">' + U.esc(e.message) + '</div>'; }
+/* ===== 灯箱 ===== */
+var lbIndex = 0;
+function lbOpen(i) {
+  if (!LB.length) return;
+  lbIndex = (i + LB.length) % LB.length;
+  document.getElementById('lbImg').src = LB[lbIndex].src;
+  document.getElementById('lbImg').alt = LB[lbIndex].cap;
+  document.getElementById('lbCap').textContent = LB[lbIndex].cap + ' · ' + (lbIndex + 1) + ' / ' + LB.length;
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
+function lbClose() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function lbMove(d) { lbOpen(lbIndex + d); }
+
+document.addEventListener('click', function (e) {
+  var op = e.target.closest('[data-lb-open]');
+  if (op) lbOpen(parseInt(op.getAttribute('data-lb-open'), 10));
+});
+document.getElementById('lbClose').onclick = lbClose;
+document.getElementById('lbPrev').onclick = function () { lbMove(-1); };
+document.getElementById('lbNext').onclick = function () { lbMove(1); };
+document.addEventListener('keydown', function (e) {
+  if (!document.getElementById('lightbox').classList.contains('open')) return;
+  if (e.key === 'Escape') lbClose();
+  if (e.key === 'ArrowLeft') lbMove(-1);
+  if (e.key === 'ArrowRight') lbMove(1);
+});
+document.getElementById('lightbox').addEventListener('click', function (e) {
+  if (e.target === this) lbClose();
+});
 
 init();
 </script>

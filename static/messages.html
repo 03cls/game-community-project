@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<title>消息中心 — AI 游戏社区评测分享平台</title>
+<link rel="stylesheet" href="css/style.css?v=proto12">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="wrap page">
+  <div class="page-head" style="display:flex; align-items:center; gap:14px; margin-bottom:18px; flex-wrap:wrap;">
+    <h2 class="section-title" style="margin:0;">🔔 消息中心</h2>
+    <span class="dim" id="unreadTip" style="font-size:13px;"></span>
+    <div style="margin-left:auto; display:flex; gap:8px;">
+      <button class="btn btn-sm" id="onlyUnreadBtn">只看未读</button>
+      <button class="btn btn-sm btn-primary" id="readAllBtn">✓ 全部已读</button>
+    </div>
+  </div>
+
+  <!-- 分类 Tab -->
+  <div class="msg-tabs" id="msgTabs">
+    <span class="msg-tab active" data-tab="all">全部</span>
+    <span class="msg-tab" data-tab="reply">💬 评论回复</span>
+    <span class="msg-tab" data-tab="like">👍 点赞</span>
+    <span class="msg-tab" data-tab="favorite">⭐ 收藏</span>
+    <span class="msg-tab" data-tab="system">📢 系统通知</span>
+  </div>
+
+  <!-- 消息列表 -->
+  <div id="msgList"><div class="loading">⏳ 加载中…</div></div>
+  <div id="msgPager" style="margin-top:16px;"></div>
+</div>
+
+<div id="footerSlot"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
+<script>
+Auth.mountNav('messages');
+document.getElementById('footerSlot').innerHTML = U.footer();
+if (!Auth.requireLogin()) throw new Error('need login');
+
+/* ===== 消息中心状态 ===== */
+var state = { tab: 'all', unreadOnly: false, page: 1 };
+var sig = '';               // 数据签名：内容无变化时跳过重渲染，避免轮询闪烁
+var TYPE_META = {
+  reply:    { icon: '💬', cls: 't-reply' },
+  like:     { icon: '👍', cls: 't-like' },
+  favorite: { icon: '⭐', cls: 't-fav' },
+  audit:    { icon: '📋', cls: 't-audit' },
+  apply:    { icon: '🎉', cls: 't-apply' },
+  system:   { icon: '📢', cls: 't-sys' }
+};
+
+/* 点击消息 → 跳转到对应评论区/详情页 */
+function jumpTarget(n) {
+  var u = Auth.user();
+  if (n.target_type === 'post' && n.target_id) return 'community-post.html?id=' + n.target_id;
+  if (n.target_type === 'review' && n.target_id) return 'review-detail.html?review_id=' + n.target_id;
+  if (n.target_type === 'game' && n.target_id) return 'game-detail.html?id=' + n.target_id;
+  if (n.target_type === 'creator_center') return 'creator-work.html';
+  if (n.target_type === 'application') {
+    /* 管理员收到新申请 → 申请管理页；申请人本人 → 个人中心 */
+    return (u && u.role === 'admin' && n.type === 'apply') ? 'admin/user.html' : 'my-profile.html?tab=apply';
+  }
+  if (n.target_type === 'profile') return 'my-profile.html';
+  return '';
+}
+
+function render(data) {
+  var box = document.getElementById('msgList');
+  var tip = document.getElementById('unreadTip');
+  tip.textContent = data.unread_total > 0
+    ? '未读 ' + data.unread_total + ' 条'
+    : '全部已读，很清爽 ✨';
+
+  if (!data.items.length) {
+    box.innerHTML = '<div class="empty"><div class="icon">📭</div>'
+      + (state.unreadOnly ? '没有未读消息' : '还没有消息，去社区互动一下试试') + '</div>';
+    document.getElementById('msgPager').innerHTML = '';
+    return;
+  }
+  box.innerHTML = data.items.map(function (n) {
+    var m = TYPE_META[n.type] || TYPE_META.system;
+    var href = jumpTarget(n);
+    return '<div class="msg-item ' + (n.is_read ? '' : 'unread') + '" data-id="' + n.id + '"'
+      + (href ? ' data-href="' + href + '"' : '') + '>'
+      + '<div class="msg-icon ' + m.cls + '">' + m.icon + '</div>'
+      + '<div class="msg-body">'
+      + '<div class="msg-title">' + U.esc(n.title) + '</div>'
+      + (n.content ? '<div class="msg-content">' + U.esc(n.content) + '</div>' : '')
+      + '<div class="msg-time">' + n.actor_name + ' · ' + U.fmtDate(n.created_at) + '</div>'
+      + '</div></div>';
+  }).join('');
+  /* 事件委托：点击 = 标记已读 + 跳转 */
+  box.onclick = function (e) {
+    var item = e.target.closest('.msg-item');
+    if (!item) return;
+    var id = item.dataset.id;
+    Api.post('/notifications/' + id + '/read', {}).then(function () {
+      Auth.refreshBell();
+      var href = item.dataset.href;
+      if (href) location.href = href; else load();
+    }).catch(function (err) { U.toast(err.message || '操作失败', 'error'); });
+  };
+  document.getElementById('msgPager').innerHTML =
+    U.pagination(data.total_pages, data.page, function (p) { state.page = p; load(); });
+}
+
+function load() {
+  var q = '/notifications?page=' + state.page + '&page_size=10'
+    + '&scope=' + (state.tab === 'all' ? 'all' : (state.tab === 'system' ? 'system' : 'interact'))
+    + (state.tab !== 'all' && state.tab !== 'system' ? '&type=' + state.tab : '')
+    + (state.unreadOnly ? '&unread=1' : '');
+  Api.get(q).then(function (data) {
+    var s = JSON.stringify(data);
+    if (s === sig) return;         // 轮询防抖
+    sig = s;
+    render(data);
+  }).catch(function (err) {
+    document.getElementById('msgList').innerHTML =
+      '<div class="empty"><div class="icon">⚠️</div>' + U.esc(err.message || '加载失败') + '</div>';
+  });
+}
+
+/* Tab 切换 */
+document.getElementById('msgTabs').onclick = function (e) {
+  var t = e.target.closest('.msg-tab');
+  if (!t) return;
+  document.querySelectorAll('#msgTabs .msg-tab').forEach(function (x) { x.classList.remove('active'); });
+  t.classList.add('active');
+  state.tab = t.dataset.tab;
+  state.page = 1; sig = '';
+  load();
+};
+
+/* 只看未读 */
+document.getElementById('onlyUnreadBtn').onclick = function () {
+  state.unreadOnly = !state.unreadOnly;
+  this.textContent = state.unreadOnly ? '显示全部' : '只看未读';
+  this.classList.toggle('btn-primary', state.unreadOnly);
+  state.page = 1; sig = '';
+  load();
+};
+
+/* 全部已读 */
+document.getElementById('readAllBtn').onclick = function () {
+  Api.post('/notifications/read-all', {}).then(function () {
+    U.toast('已全部标记为已读', 'success');
+    Auth.refreshBell();
+    sig = '';
+    load();
+  }).catch(function (err) { U.toast(err.message || '操作失败', 'error'); });
+};
+
+load();
+/* 实时刷新：10 秒轮询，有新消息自动出现在列表 */
+setInterval(function () { if (!document.hidden) load(); }, 10000);
+</script>
+</body>
+</html>

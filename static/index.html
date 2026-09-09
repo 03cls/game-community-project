@@ -1,20 +1,20 @@
-<!DOCTYPE html>
+﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width">
 <title>首页 — AI 游戏社区评测分享平台</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
 
 <div class="wrap page">
 
-  <div class="grid" style="grid-template-columns: 2fr 1fr; gap:20px; margin-bottom: 8px;">
+  <div class="grid hero-grid" style="grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap:20px; margin-bottom: 8px;">
     <!-- Hero 轮播 -->
     <div class="hero" id="hero">
-      <img id="heroImg" src="" alt="">
+      <img id="heroImg" alt="" onerror="if(window.coverError)coverError(this)">
       <div class="hero-info">
         <span class="badge badge-amber" id="heroCat"></span>
         <h2 id="heroName" style="font-size:26px; margin:8px 0 4px;"></h2>
@@ -24,13 +24,20 @@
       <div class="hero-dots" id="heroDots"></div>
     </div>
 
-    <!-- AI 推荐助手 -->
+    <!-- AI 对话推荐助手 -->
     <div class="ai-panel" style="display:flex; flex-direction:column;">
       <div class="ai-title">🤖 AI 游戏推荐助手</div>
-      <p class="muted" style="font-size:13px; margin-bottom:12px;">基于你的收藏与游玩记录，或输入偏好描述，获取个性化推荐与理由。</p>
-      <textarea class="input" id="prefInput" rows="2" placeholder="可选：描述你的偏好，如「开放世界 剧情向」…"></textarea>
-      <button class="btn btn-primary btn-block mt-16" id="btnRecommend">获取 AI 推荐</button>
-      <div id="recoResult" style="margin-top:14px; overflow-y:auto; flex:1;"></div>
+      <div class="chat-box" id="aiChatBox"></div>
+      <div class="ai-chips" id="aiChips">
+          <span class="tag clickable" data-qs="推荐巡礼第1弹：开放世界神作|推荐巡礼第2弹：西式RPG巅峰|推荐巡礼第3弹：未来科幻世界|推荐巡礼第4弹：竞技射击|推荐巡礼第5弹：爽快动作|推荐巡礼第6弹：冒险与狩猎|推荐巡礼第7弹：独立肉鸽神作|推荐巡礼第8弹：烧脑策略|推荐巡礼第9弹：沙盒与模拟经营|推荐巡礼第10弹：驰骋竞速与末日求生">🎮 推荐游戏</span>
+          <span class="tag clickable" data-qs="游戏百科第1讲：开放世界篇|游戏百科第2讲：RPG篇|游戏百科第3讲：科幻篇|游戏百科第4讲：射击篇|游戏百科第5讲：动作篇|游戏百科第6讲：冒险狩猎篇|游戏百科第7讲：独立游戏篇|游戏百科第8讲：策略篇|游戏百科第9讲：沙盒模拟篇|游戏百科第10讲：竞速末日篇">📖 游戏百科</span>
+          <span class="tag clickable" data-qs="游戏库里评分最高的游戏是哪几款|最近热度最高最火的游戏有哪些|游戏库里有哪些获得过TGA年度游戏的作品|好评如潮的独立游戏神作有哪些|打折时性价比最高的游戏推荐|有什么好玩的联机游戏可以和朋友一起|剧情最棒最催泪的游戏是哪几款|画面表现最好的游戏有哪些|最杀时间的耐玩游戏排行|新手入门入坑适合玩什么游戏">⭐ 高分榜单</span>
+          <span class="tag clickable" data-qs="如何申请成为创作者|积分怎么获得|等级是怎么划分的|评测审核流程是怎样的|社区怎么发帖|怎么举报违规内容|收藏的内容在哪里看|游戏的评分规则是什么|短评和评测有什么区别|平台功能都有哪些">💡 平台答疑</span>
+        </div>
+      <div class="flex" style="gap:8px;">
+        <input class="input" id="aiChatInput" placeholder="如：推荐几款开放世界游戏…" style="flex:1; min-width:0;">
+        <button class="btn btn-primary" id="aiChatSend">发送</button>
+      </div>
     </div>
   </div>
 
@@ -38,17 +45,31 @@
   <h3 class="section-title mt-24">🔥 热门游戏 <a class="more" href="game-list.html">查看全部 →</a></h3>
   <div class="grid grid-4" id="hotGames"></div>
 
-  <!-- 最新评测 -->
-  <h3 class="section-title mt-24">📝 最新评测攻略</h3>
-  <div class="grid grid-2" id="latestReviews"></div>
+  <!-- 资深创作者专题（L3+ 权益：首页专题展示入口） -->
+  <div id="hallWrap" style="display:none;">
+    <h3 class="section-title mt-24">🌟 资深创作者专题 <span class="dim" style="font-size:13px; font-weight:400;">L3 资深 / L4 核心创作者的优质评测，精选与高等级优先</span></h3>
+    <div class="grid grid-3" id="hallZone"></div>
+  </div>
+
+  <!-- 游戏评测专区（独立栏目：全部公开评测，时间倒序，支持按游戏名称筛选） -->
+  <h3 class="section-title mt-24">📝 游戏评测 <span class="dim" style="font-size:13px; font-weight:400;">独立评测专区 · 最新优先 · 点击卡片查看评测详情</span></h3>
+  <div class="card" style="padding:14px 20px; margin-bottom:14px;">
+    <div class="flex" style="gap:10px; flex-wrap:wrap;">
+      <input class="input" id="reviewKw" placeholder="输入游戏名称，筛选该游戏的所有评测…" style="max-width:340px;">
+      <button class="btn btn-primary" id="reviewSearchBtn">🔍 搜索</button>
+      <button class="btn" id="reviewResetBtn">重置</button>
+    </div>
+  </div>
+  <div class="grid grid-2" id="reviewZone"><div class="loading" style="grid-column:1/-1;">⏳ 加载中…</div></div>
+  <div id="reviewZonePager"></div>
 </div>
 
 <div id="footerSlot"></div>
 
 <script src="js/mock.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
 <script>
 Auth.mountNav('home');
 document.getElementById('footerSlot').innerHTML = U.footer();
@@ -60,7 +81,29 @@ async function init() {
   games = data.items;
   renderHero();
   renderHot();
-  loadReviews();
+  loadHall();
+  loadReviewZone();
+}
+
+/* ===== 资深创作者专题：GET /creator/hall（L3+ 创作者的公开评测） ===== */
+async function loadHall() {
+  var data;
+  try {
+    data = await Api.get('/creator/hall?page_size=6');
+  } catch (e) { return; }
+  if (!data.items || !data.items.length) return;
+  document.getElementById('hallWrap').style.display = '';
+  document.getElementById('hallZone').innerHTML = data.items.map(function (r) {
+    return '<div class="card card-hover" onclick="location.href=\'review-detail.html?review_id=' + r.id + '\'">'
+      + '<div class="review-title" style="font-size:15px;">' + U.esc(r.title)
+      + (r.is_featured ? ' <span class="featured-flag">⭐</span>' : '') + '</div>'
+      + '<div class="review-meta" style="margin:6px 0;">✍️ ' + U.esc(r.author_name)
+      + (r.author_level != null ? ' ' + Auth.levelBadge(r.author_level, { short: true, icon: false }) : '') + '</div>'
+      + '<p class="muted" style="font-size:12px; line-height:1.6; margin:4px 0;">' + U.esc(r.summary) + '</p>'
+      + '<div class="review-meta">🎮 ' + U.esc(r.game_name)
+      + (r.score != null ? ' · <span class="score">★ ' + Number(r.score).toFixed(1) + '</span>' : '') + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 function renderHero() {
@@ -92,46 +135,153 @@ function renderHot() {
   document.getElementById('hotGames').innerHTML = games.slice(0, 4).map(U.gameCard).join('');
 }
 
-async function loadReviews() {
-  /* 取前几个游戏的已发布评测 */
-  var all = [];
-  for (var i = 0; i < games.length && all.length < 4; i++) {
-    var r = await Api.get('/games/' + games[i].id + '/reviews?page=1');
-    all = all.concat(r.items);
+/* ===== 游戏评测专区：GET /reviews 全部公开评测，时间倒序，keyword 按游戏名称过滤 ===== */
+var reviewState = { page: 1, keyword: '' };
+var reviewZoneSig = '';   // 数据签名：内容无变化时跳过重渲染，避免轮询闪烁
+
+async function loadReviewZone(page) {
+  if (page) reviewState.page = page;
+  var box = document.getElementById('reviewZone');
+  var q = '/reviews?page=' + reviewState.page + '&page_size=8'
+    + (reviewState.keyword ? '&keyword=' + encodeURIComponent(reviewState.keyword) : '');
+  var data;
+  try {
+    data = await Api.get(q);
+  } catch (e) {
+    box.innerHTML = '<div class="empty" style="grid-column:1/-1;">' + U.esc(e.message) + '</div>';
+    return;
   }
-  all.sort(function (a, b) { return b.created_at.localeCompare(a.created_at); });
-  document.getElementById('latestReviews').innerHTML = all.slice(0, 4).map(function (r) {
-    return '<div class="card card-hover" onclick="location.href=\'game-detail.html?id=' + r.game_id + '\'">'
+  /* 轮询防抖：数据签名一致则不重绘 */
+  var sig = JSON.stringify(data);
+  if (sig === reviewZoneSig) return;
+  reviewZoneSig = sig;
+  if (!data.items.length) {
+    box.innerHTML = '<div class="empty" style="grid-column:1/-1;"><div class="icon">📭</div>没有找到相关评测</div>';
+    document.getElementById('reviewZonePager').innerHTML = '';
+    return;
+  }
+  box.innerHTML = data.items.map(function (r) {
+    return '<div class="card card-hover" onclick="location.href=\'review-detail.html?review_id=' + r.id + '\'">'
       + '<div class="flex" style="align-items:flex-start; gap:14px;">'
-      + '<img src="' + U.esc(r.game_cover) + '" style="width:130px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; flex-shrink:0;">'
-      + '<div style="min-width:0;"><div class="review-title">' + U.esc(r.title) + '</div>'
-      + '<div class="review-meta" style="margin:6px 0;">🎮 ' + U.esc(r.game_name) + ' · ✍️ ' + U.esc(r.author_name) + '</div>'
-      + '<div class="review-meta">👁 ' + U.fmtNum(r.read_count) + ' · ❤ ' + U.fmtNum(r.like_count) + ' · ' + U.fmtDate(r.created_at) + '</div>'
+      + '<img src="' + U.esc(r.game_cover) + '" style="width:130px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; flex-shrink:0;" loading="lazy" onerror="coverError(this)">'
+      + '<div style="min-width:0;">'
+      + '<div class="review-title">' + U.esc(r.title)
+      + (r.is_featured ? ' <span class="featured-flag">⭐ 精选</span>' : '') + '</div>'
+      + '<div class="review-meta" style="margin:6px 0;">🎮 ' + U.esc(r.game_name)
+      + ' · ✍️ ' + U.esc(r.author_name)
+      + (r.author_level != null ? ' ' + Auth.levelBadge(r.author_level, { short: true, icon: false }) : '')
+      + (r.score != null ? ' · <span class="score">★ ' + Number(r.score).toFixed(1) + '</span>' : '')
+      + '</div>'
+      + '<p class="muted" style="font-size:12px; line-height:1.6; margin:4px 0;">' + U.esc(r.summary) + '</p>'
+      + '<div class="review-meta">🕒 ' + U.fmtDate(r.created_at) + '</div>'
       + '</div></div></div>';
   }).join('');
+  document.getElementById('reviewZonePager').innerHTML = U.pagination(data.total_pages, data.page, loadReviewZone);
 }
 
-/* AI 推荐 */
-document.getElementById('btnRecommend').onclick = async function () {
-  if (!Auth.user()) { U.toast('请先登录后再使用 AI 推荐', 'error'); setTimeout(function(){ location.href = 'login.html'; }, 900); return; }
-  var btn = this;
-  btn.disabled = true; btn.textContent = 'AI 分析中…（约 3-8 秒）';
-  var box = document.getElementById('recoResult');
-  box.innerHTML = '<div class="loading">🤖 正在分析你的游戏口味…</div>';
-  try {
-    var res = await Api.post('/ai/game-recommend', { preferences: document.getElementById('prefInput').value.trim() });
-    box.innerHTML = res.recommendations.map(function (r) {
+document.getElementById('reviewSearchBtn').onclick = function () {
+  reviewState.keyword = document.getElementById('reviewKw').value.trim();
+  loadReviewZone(1);
+};
+document.getElementById('reviewResetBtn').onclick = function () {
+  document.getElementById('reviewKw').value = '';
+  reviewState.keyword = '';
+  loadReviewZone(1);
+};
+document.getElementById('reviewKw').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('reviewSearchBtn').click();
+});
+
+/* ===== AI 对话助手：意图识别（推荐/评分/攻略/平台答疑） ===== */
+var aiHistory = [];   // [{role, content}] 简单上下文
+
+function aiAddMsg(text, who, recos) {
+  var box = document.getElementById('aiChatBox');
+  var el = document.createElement('div');
+  el.className = 'chat-msg ' + who;
+  el.style.whiteSpace = 'pre-wrap';
+  el.textContent = text;
+  if (recos && recos.length) {
+    var wrap = document.createElement('div');
+    wrap.style.marginTop = '8px';
+    wrap.innerHTML = recos.map(function (r) {
       return '<div class="reco-card" onclick="location.href=\'game-detail.html?id=' + r.game_id + '\'">'
-        + '<img src="' + U.esc(r.cover_url) + '">'
-        + '<div style="min-width:0;"><b>' + U.esc(r.game_name) + '</b> <span class="score">★' + r.average_score.toFixed(1) + '</span>'
+        + '<img src="' + U.esc(r.cover_url) + '" onerror="coverError(this)">'
+        + '<div style="min-width:0;"><b>' + U.esc(r.game_name) + '</b> <span class="score">★' + Number(r.average_score).toFixed(1) + '</span>'
         + '<p class="muted" style="font-size:12px; margin-top:4px;">' + U.esc(r.reason) + '</p></div></div>';
     }).join('');
-  } catch (e) {
-    box.innerHTML = '<div class="empty">推荐失败：' + U.esc(e.message) + '</div>';
-  } finally {
-    btn.disabled = false; btn.textContent = '获取 AI 推荐';
+    el.appendChild(wrap);
   }
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function aiThinking() {
+  var box = document.getElementById('aiChatBox');
+  var el = document.createElement('div');
+  el.className = 'chat-msg ai';
+  el.id = 'aiThinking';
+  el.textContent = 'AI 思考中…（3-8 秒）';
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+window.quickAsk = function (q) {
+  var input = document.getElementById('aiChatInput');
+  if (input.disabled) return;   // 上一条请求还在处理，避免重复发送
+  input.value = '';
+  askAI(q);
 };
+/* 快捷标签：事件委托，点击按顺序轮换发送该标签下的问题（避免重复单一内容） */
+document.getElementById('aiChips').addEventListener('click', function (e) {
+  var t = e.target.closest('.tag');
+  if (!t || !t.dataset.qs) return;
+  var qs = t.dataset.qs.split('|').filter(Boolean);
+  if (!qs.length) return;
+  var i = parseInt(t.dataset.mi || '0', 10) % qs.length;
+  t.dataset.mi = String(i + 1);
+  quickAsk(qs[i]);
+});
+
+async function askAI(message) {
+  if (!message) return;
+  aiAddMsg(message, 'me');
+  aiHistory.push({ role: 'user', content: message });
+  if (aiHistory.length > 8) aiHistory = aiHistory.slice(-8);
+  aiThinking();
+  var input = document.getElementById('aiChatInput');
+  var send = document.getElementById('aiChatSend');
+  input.disabled = true; send.disabled = true;
+  try {
+    var res = await Api.post('/ai/chat', { message: message, history: aiHistory.slice(0, -1) });
+    document.getElementById('aiThinking').remove();
+    aiAddMsg(res.reply, 'ai', res.recommendations);
+    aiHistory.push({ role: 'assistant', content: res.reply });
+  } catch (e) {
+    var t = document.getElementById('aiThinking');
+    if (t) t.remove();
+    aiAddMsg('出错了：' + e.message, 'ai');
+  } finally {
+    input.disabled = false; send.disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById('aiChatSend').onclick = function () {
+  var input = document.getElementById('aiChatInput');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  askAI(msg);
+};
+document.getElementById('aiChatInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('aiChatSend').click();
+});
+aiAddMsg('你好，我是 AI 游戏推荐助手 🎮 试试点击下方标签，或直接问我：\n· 「推荐几款开放世界游戏」\n· 「艾尔登法环评分多少」\n· 「卡关了怎么办」', 'ai');
+
+/* ===== 首页评测栏轮询（方案一，间隔 9s）：管理员审批通过后评测自动出现，无需手动刷新；离开页面销毁定时器 ===== */
+var reviewZoneTimer = setInterval(function () { loadReviewZone(); }, 9000);
+window.addEventListener('beforeunload', function () { clearInterval(reviewZoneTimer); });
 
 init();
 </script>

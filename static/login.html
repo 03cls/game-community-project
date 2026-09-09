@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>登录 — AI 游戏社区评测分享平台</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=proto12">
 </head>
 <body>
 <div class="auth-page">
@@ -41,9 +41,22 @@
 </div>
 
 <script src="js/mock.js"></script>
-<script src="js/api.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
 <script>
+/* add=1 模式：追加账号（不退出已有账号） */
+var isAddMode = U.qs('add') === '1';
+if (isAddMode) {
+  document.title = '添加账号 — GameReview AI';
+  var btn = document.getElementById('loginBtn');
+  if (btn) btn.textContent = '➕ 添加并切换';
+  var notice = document.createElement('div');
+  notice.className = 'dim';
+  notice.style.cssText = 'text-align:center; font-size:12px; margin-bottom:10px; color:var(--accent-2);';
+  notice.textContent = '🔄 添加账号模式：登录后可在导航栏随时切换账号';
+  document.getElementById('loginForm').insertBefore(notice, document.getElementById('loginForm').firstChild);
+}
+
 async function doLogin(e) {
   e.preventDefault();
   var btn = document.getElementById('loginBtn');
@@ -54,16 +67,19 @@ async function doLogin(e) {
       password: document.getElementById('password').value
     });
     Api.setSession(res.access_token, res.user);
-    U.toast('登录成功，欢迎回来！', 'success');
+    U.toast(isAddMode ? '账号添加成功！' : '登录成功，欢迎回来！', 'success');
     var redirect = U.qs('redirect');
     setTimeout(function () {
       if (redirect) location.href = redirect;
-      else if (res.role === 'admin') location.href = 'admin/index.html';
+      else if (isAddMode) {
+        /* 添加账号模式：回到首页，用户可自行导航 */
+        location.href = 'index.html';
+      } else if (res.role === 'admin') location.href = 'admin/index.html';
       else location.href = 'index.html';
     }, 700);
   } catch (err) {
     U.toast(err.message || '登录失败', 'error');
-    btn.disabled = false; btn.textContent = '登 录';
+    btn.disabled = false; btn.textContent = isAddMode ? '➕ 添加并切换' : '登 录';
   }
   return false;
 }

@@ -3,14 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <title>个人中心 — AI 游戏社区评测分享平台</title>
-<link rel="stylesheet" href="css/style.css">
-<style>#avatarBig .avatar { width: 72px; height: 72px; font-size: 28px; }</style>
+<link rel="stylesheet" href="css/style.css?v=proto12">
+<style>
+#avatarBig .avatar { width: 72px; height: 72px; font-size: 28px; }
+/* 锚点快捷导航 */
+.anchor-nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+.anchor-nav a { display:inline-block; padding:5px 14px; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:13px; color:var(--text-2); text-decoration:none; transition:.15s; }
+.anchor-nav a:hover { border-color:var(--accent-2); color:var(--accent-2); transform:translateY(-1px); }
+/* 申请卡片定位高亮 */
+@keyframes flashCard { 0%,100% { box-shadow:0 0 0 0 rgba(79,140,255,0); } 35% { box-shadow:0 0 0 4px rgba(79,140,255,.4); } }
+.card.flash { animation:flashCard 1.4s ease 2; border-color:var(--accent-2); }
+/* 擅长方向标签 */
+.badge-purple { background: rgba(124,92,255,.15); color: var(--accent); }
+.tag-chip { display:inline-block; padding:4px 12px; margin:0 8px 8px 0; border-radius:999px; border:1px solid var(--border); font-size:12.5px; color:var(--text-2); cursor:pointer; user-select:none; transition:.15s; }
+.tag-chip:hover { border-color:var(--accent-2); }
+.tag-chip.on { background:var(--accent-2); border-color:var(--accent-2); color:#fff; }
+/* 我的评论条目 */
+.cm-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.cm-item:last-child { border-bottom:none; }
+.cm-cover { width:84px; height:48px; object-fit:cover; border-radius:6px; flex:none; background:var(--surface-2); }
+.cm-content { min-width:0; flex:1; }
+.cm-text { font-size:13.5px; margin-top:3px; word-break:break-word; color:var(--text); }
+/* 字数计数 */
+.char-count { font-size:11.5px; color:var(--text-3); text-align:right; margin-top:2px; }
+.char-count.over { color:var(--red); }
+</style>
 </head>
 <body>
 <div id="navbar"></div>
 
 <div class="wrap page">
-  <h2 class="section-title" style="margin-bottom:20px;">个人中心</h2>
+  <h2 class="section-title" style="margin-bottom:14px;">个人中心</h2>
+  <div class="anchor-nav">
+    <a href="#favSec">⭐ 我的收藏</a>
+    <a href="#rvSec">📖 评测互动</a>
+    <a href="#mineSec">✍️ 我的评测</a>
+    <a href="#cmSec">💬 我的评论</a>
+    <a href="#cSec">📢 我的社区</a>
+    <a href="#recSec">🎮 游玩档案</a>
+  </div>
   <div class="grid" style="grid-template-columns: 320px 1fr; gap:20px; align-items:start;">
 
     <!-- 左：资料与设置 -->
@@ -19,6 +50,7 @@
         <div id="avatarBig" style="margin:0 auto 10px;"></div>
         <b id="nickShow" style="font-size:16px;"></b>
         <div style="margin-top:6px;"><span class="badge" id="roleBadge"></span></div>
+        <div id="levelBadge" style="margin-top:8px;"></div>
         <p class="dim" id="bioShow" style="margin-top:10px;"></p>
       </div>
 
@@ -42,18 +74,56 @@
       </div>
 
       <div class="card" id="applyCard">
-        <h3 class="section-title" style="font-size:15px;">📝 申请成为创作者</h3>
-        <p class="dim" style="font-size:12px; margin-bottom:10px;">通过审核后即可发布评测攻略、使用 AI 攻略创作助手。</p>
+        <h3 class="section-title" style="font-size:15px;">📝 创作者申请</h3>
         <div id="applyBody"></div>
       </div>
     </div>
 
     <!-- 右：收藏 + 游玩档案 -->
     <div>
-      <h3 class="section-title">⭐ 我的收藏 <a class="more" href="game-list.html">去发现更多 →</a></h3>
+      <h3 class="section-title mt-24" id="favSec">⭐ 我的收藏 <a class="more" href="game-list.html">去发现更多 →</a></h3>
       <div class="grid grid-3" id="favGrid"><div class="loading" style="grid-column:1/-1;">加载中…</div></div>
 
-      <h3 class="section-title mt-24">🎮 游玩档案</h3>
+      <h3 class="section-title mt-24" id="rvSec">📖 评测互动</h3>
+      <div class="card" style="padding:14px 18px;">
+        <div class="seg" id="rvSeg" style="margin-bottom:12px;">
+          <button data-tab="likes" class="active">👍 我赞过的评测</button>
+          <button data-tab="favorites">⭐ 我收藏的评测</button>
+        </div>
+        <div id="rvZone"><div class="loading">加载中…</div></div>
+      </div>
+
+      <h3 class="section-title mt-24" id="mineSec">✍️ 我的评测 <a class="more" id="ccLink" href="creator-work.html">创作者中心 →</a></h3>
+      <div class="card" style="padding:14px 18px;" id="mineCard">
+        <div class="seg" id="mineSeg" style="margin-bottom:12px;">
+          <button class="active" data-status="all">全部</button>
+          <button data-status="published">已发布</button>
+          <button data-status="draft">草稿</button>
+          <button data-status="audit">待审核</button>
+          <button data-status="rejected">已驳回</button>
+        </div>
+        <div id="mineZone"><div class="loading">加载中…</div></div>
+        <div id="minePager"></div>
+      </div>
+
+      <h3 class="section-title mt-24" id="cmSec">💬 我的评论 <span class="dim" style="font-size:12.5px;">游戏短评论与评测评论</span></h3>
+      <div class="card" style="padding:14px 18px;">
+        <div id="cmZone"><div class="loading">加载中…</div></div>
+        <div id="cmPager"></div>
+      </div>
+
+      <h3 class="section-title mt-24" id="cSec">📢 我的社区 <a class="more" href="community.html">去社区逛逛 →</a></h3>
+      <div class="card" style="padding:14px 18px;">
+        <div class="seg" id="cSeg" style="margin-bottom:12px;">
+          <button data-tab="posts" class="active">我的帖子</button>
+          <button data-tab="favorites">我的收藏</button>
+          <button data-tab="likes">我的点赞</button>
+        </div>
+        <div id="cZone"><div class="loading">加载中…</div></div>
+        <div id="cPager"></div>
+      </div>
+
+      <h3 class="section-title mt-24" id="recSec">🎮 游玩档案</h3>
       <div class="card table-wrap">
         <table class="data">
           <thead><tr><th>游戏</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
@@ -67,9 +137,9 @@
 <div id="footerSlot"></div>
 
 <script src="js/mock.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
 <script>
 if (!Auth.requireLogin()) throw new Error('redirect');
 Auth.mountNav();
@@ -77,6 +147,9 @@ document.getElementById('footerSlot').innerHTML = U.footer();
 
 var me = null;
 var PLAY_MAP = { want: '想玩', playing: '正在玩', completed: '已通关' };
+/* 创作者中心入口：普通玩家 → 申请成为创作者界面；创作者/管理员 → 工作台 */
+var isCreator = function () { return me && (me.role === 'creator' || me.role === 'admin'); };
+var ccHref = function () { return isCreator() ? 'creator-work.html' : 'my-profile.html?tab=apply'; };
 
 async function init() {
   me = await Api.get('/users/me');
@@ -84,13 +157,206 @@ async function init() {
   document.getElementById('nickShow').textContent = me.profile.nickname || me.username;
   document.getElementById('roleBadge').className = 'badge ' + Auth.roleBadge[me.role];
   document.getElementById('roleBadge').textContent = Auth.roleName[me.role];
+  if (me.role === 'creator' || me.role === 'admin') {
+    document.getElementById('levelBadge').innerHTML = Auth.levelBadge(me.creator_level || 0)
+      + '<div class="dim" style="font-size:12px; margin-top:4px;">⭐ 创作者积分 ' + (me.creator_points || 0)
+      + ' · <a href="creator-work.html" style="color:var(--accent-2);">工作台</a></div>';
+  } else {
+    document.getElementById('levelBadge').innerHTML = '<div class="dim" style="font-size:12px;">💡 成为创作者即可发布攻略与评测</div>';
+  }
   document.getElementById('bioShow').textContent = me.profile.bio || '这个人很懒，什么都没写…';
   document.getElementById('nickname').value = me.profile.nickname || '';
   document.getElementById('avatar').value = me.profile.avatar || '';
   document.getElementById('bio').value = me.profile.bio || '';
+  document.getElementById('ccLink').href = ccHref();
   loadFavs();
   loadRecords();
   loadApply();
+  loadMyReviewInteraction('likes');
+  loadMyReviews();
+  loadMyComments(1);
+  loadMyCommunity('posts', 1);
+}
+
+/* ---------- 我的评测：自己发布的全部评测（含待审核/已驳回/草稿） ---------- */
+var RV_STATUS = { published: ['已发布', 'badge-green'], manual_review: ['待审核', 'badge-blue'], audit: ['审核中', 'badge-blue'], rejected: ['已驳回', 'badge-red'], draft: ['草稿', ''] };
+var mineState = { status: 'all', page: 1 };
+
+U.$all('#mineSeg button').forEach(function (b) {
+  b.onclick = function () {
+    U.$all('#mineSeg button').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    mineState.status = b.dataset.status;
+    mineState.page = 1;
+    loadMyReviews();
+  };
+});
+
+async function loadMyReviews(page) {
+  mineState.page = page || mineState.page || 1;
+  var box = document.getElementById('mineZone');
+  var q = '/reviews/mine?page=' + mineState.page + '&page_size=5'
+    + (mineState.status !== 'all' ? '&status=' + mineState.status : '');
+  try {
+    var data = await Api.get(q);
+    if (!data.items.length) {
+      box.innerHTML = '<div class="empty">该分类下还没有评测，<a href="' + ccHref() + '">'
+        + (isCreator() ? '去创作者中心' : '申请成为创作者') + '</a>开始创作 →</div>';
+      document.getElementById('minePager').innerHTML = '';
+      return;
+    }
+    box.innerHTML = data.items.map(function (r) {
+      var st = RV_STATUS[r.status] || [r.status, ''];
+      return '<div style="padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer;" onclick="location.href=\'review-detail.html?review_id=' + r.id + '\'">'
+        + '<div class="flex" style="gap:8px; align-items:center;">'
+        + '<span class="badge ' + st[1] + '">' + st[0] + '</span>'
+        + '<b style="font-size:13.5px;">' + U.esc(r.title) + '</b>'
+        + (r.is_featured ? '<span class="badge badge-gold">精选</span>' : '')
+        + '</div>'
+        + '<div class="dim" style="font-size:12px; margin-top:4px;">🎮 ' + U.esc(r.game_name)
+        + ' · 👍 ' + U.fmtNum(r.like_count)
+        + ' · ⭐ ' + U.fmtNum(r.fav_count)
+        + ' · 👁️ ' + U.fmtNum(r.read_count)
+        + ' · ' + U.fmtDate(r.created_at)
+        + (r.status === 'rejected' && r.audit_reason ? ' · 驳回原因：' + U.esc(r.audit_reason) : '')
+        + '</div>'
+        + '</div>';
+    }).join('');
+    document.getElementById('minePager').innerHTML =
+      U.pagination(data.total_pages, data.page, loadMyReviews);
+  } catch (e) {
+    box.innerHTML = '<div class="empty">' + U.esc(e.message) + '</div>';
+    document.getElementById('minePager').innerHTML = '';
+  }
+}
+
+/* ---------- 我的评论：游戏短评论 + 评测评论，时间倒序分页 ---------- */
+var cmPage = 1;
+
+async function loadMyComments(page) {
+  cmPage = page || 1;
+  var box = document.getElementById('cmZone');
+  try {
+    var data = await Api.get('/comments/mine?page=' + cmPage + '&page_size=5');
+    if (!data.items.length) {
+      box.innerHTML = '<div class="empty">还没有发表过评论，去<a href="game-list.html">游戏库</a>'
+        + '或<a href="index.html">评测区</a>看看吧 →</div>';
+      document.getElementById('cmPager').innerHTML = '';
+      return;
+    }
+    box.innerHTML = data.items.map(function (c) {
+      var isGame = c.target_type === 'game';
+      var href = (isGame ? 'game-detail.html?id=' + c.target_id : 'review-detail.html?review_id=' + c.target_id) + '#comment-' + c.id;
+      var cover = c.target_cover
+        ? '<img class="cm-cover" src="' + U.esc(c.target_cover) + '" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+        : '<div class="cm-cover"></div>';
+      return '<div class="cm-item" id="comment-' + c.id + '">'
+        + cover
+        + '<div class="cm-content">'
+        + '<div class="flex" style="gap:8px; align-items:center; flex-wrap:wrap;">'
+        + '<span class="badge ' + (isGame ? 'badge-blue' : 'badge-purple') + '">' + (isGame ? '🎮 游戏短评' : '✍️ 评测评论') + '</span>'
+        + '<a href="' + href + '" style="font-size:13px; color:var(--accent-2);">' + U.esc(c.target_name) + ' ↗</a>'
+        + '<span class="dim" style="font-size:12px; margin-left:auto;">' + U.fmtDate(c.created_at) + '</span>'
+        + '</div>'
+        + '<div class="cm-text">' + U.esc(c.content) + '</div>'
+        + '<div class="flex" style="gap:14px; font-size:12px; margin-top:4px; align-items:center;">'
+        + '<span class="dim">👍 ' + U.fmtNum(c.like_count) + '</span>'
+        + '<a href="' + href + '" style="color:var(--accent-2);">查看原文 ↗</a>'
+        + '<a href="javascript:delMyComment(' + c.id + ')" style="color:var(--red); margin-left:auto;">删除</a>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+    document.getElementById('cmPager').innerHTML = U.pagination(data.total_pages, data.page, loadMyComments);
+  } catch (e) {
+    box.innerHTML = '<div class="empty">' + U.esc(e.message) + '</div>';
+    document.getElementById('cmPager').innerHTML = '';
+  }
+}
+
+/* 删除我的评论 */
+window.delMyComment = async function (cid) {
+  if (!confirm('确定删除这条评论？')) return;
+  try {
+    await Api.del('/comments/' + cid);
+    U.toast('评论已删除', 'success');
+    await loadMyComments(cmPage);
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+/* ---------- 评测互动：我赞过 / 我收藏的评测 ---------- */
+U.$all('#rvSeg button').forEach(function (b) {
+  b.onclick = function () {
+    U.$all('#rvSeg button').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    loadMyReviewInteraction(b.dataset.tab);
+  };
+});
+
+async function loadMyReviewInteraction(tab) {
+  var box = document.getElementById('rvZone');
+  try {
+    var data = await Api.get('/reviews/me/' + (tab === 'likes' ? 'likes' : 'favorites'));
+    if (!data.items.length) {
+      box.innerHTML = '<div class="empty">'
+        + (tab === 'likes' ? '还没有点赞过评测' : '还没有收藏评测')
+        + '，去<a href="index.html">首页评测栏</a>逛逛 →</div>';
+      return;
+    }
+    box.innerHTML = data.items.map(function (r) {
+      return '<div style="padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer;" onclick="location.href=\'review-detail.html?review_id=' + r.id + '\'">'
+        + '<div class="flex" style="gap:8px; align-items:center;">'
+        + '<img src="' + U.esc(r.game_cover) + '" loading="lazy" style="width:72px; height:40px; object-fit:cover; border-radius:6px;" onerror="this.style.display=\'none\'">'
+        + '<b style="font-size:13.5px;">' + U.esc(r.title) + '</b>'
+        + (r.is_featured ? '<span class="badge badge-gold">精选</span>' : '')
+        + '</div>'
+        + '<div class="dim" style="font-size:12px; margin-top:4px;">🎮 ' + U.esc(r.game_name)
+        + ' · ✍️ ' + U.esc(r.author_name)
+        + ' · 👍 ' + U.fmtNum(r.like_count)
+        + ' · ⭐ ' + U.fmtNum(r.fav_count)
+        + ' · 👁️ ' + U.fmtNum(r.read_count)
+        + ' · ' + U.fmtDate(r.created_at) + '</div>'
+        + '</div>';
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<div class="empty">' + U.esc(e.message) + '</div>';
+  }
+}
+
+/* ---------- 我的社区：帖子/收藏/点赞 ---------- */
+var cTab = 'posts';
+U.$all('#cSeg button').forEach(function (b) {
+  b.onclick = function () {
+    U.$all('#cSeg button').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    loadMyCommunity(b.dataset.tab, 1);
+  };
+});
+
+async function loadMyCommunity(tab, page) {
+  cTab = tab;
+  try {
+    var data = await Api.get('/community/users/' + me.id + '/posts?tab=' + tab + '&page=' + (page || 1) + '&page_size=5');
+    var box = document.getElementById('cZone');
+    if (!data.items.length) {
+      var hint = { posts: '还没有发过帖', favorites: '还没有收藏帖子', likes: '还没有点赞过帖子' }[tab];
+      box.innerHTML = '<div class="empty">' + hint + '，<a href="community.html">去社区看看 →</a></div>';
+      document.getElementById('cPager').innerHTML = '';
+      return;
+    }
+    box.innerHTML = data.items.map(function (p) {
+      return '<div style="padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer;" onclick="location.href=\'community-post.html?id=' + p.id + '\'">'
+        + '<div class="flex" style="gap:8px; align-items:center;">'
+        + '<span class="badge badge-blue">' + U.esc(p.tag) + '</span>'
+        + '<b style="font-size:14px;">' + U.esc(p.title) + '</b></div>'
+        + '<div class="dim" style="font-size:12px; margin-top:4px;">👍 ' + U.fmtNum(p.like_count)
+        + ' · ⭐ ' + U.fmtNum(p.fav_count) + ' · 💬 ' + U.fmtNum(p.comment_count)
+        + ' · ' + U.fmtDate(p.created_at) + '</div></div>';
+    }).join('');
+    document.getElementById('cPager').innerHTML = U.pagination(data.total_pages, data.page, function (pg) { loadMyCommunity(cTab, pg); });
+  } catch (e) {
+    document.getElementById('cZone').innerHTML = '<div class="empty">' + U.esc(e.message) + '</div>';
+  }
 }
 
 async function saveProfile(e) {
@@ -127,7 +393,7 @@ async function loadFavs() {
   var box = document.getElementById('favGrid');
   box.innerHTML = data.items.length ? data.items.map(function (g) {
     return '<div class="card card-hover game-card" onclick="location.href=\'game-detail.html?id=' + g.id + '\'">'
-      + '<img class="cover" src="' + U.esc(g.cover_url) + '">'
+      + '<img class="cover" src="' + U.esc(g.cover_url) + '" onerror="coverError(this)">'
       + '<div class="body"><div class="name">' + U.esc(g.name) + '</div>'
       + '<div class="foot"><span class="score">★ ' + g.average_score.toFixed(1) + '</span>'
       + '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();unfav(' + g.id + ')">取消收藏</button></div>'
@@ -161,26 +427,122 @@ window.setRecord = async function (gameId, status) {
   loadRecords();
 };
 
+/* ---------- 创作者申请：状态展示 + 多字段申请表单 ---------- */
+var APPLY_TAGS = ['攻略心得', '新游首发评测', '深度长文解析', '怀旧游戏回顾', '游戏行业观察', '独立游戏推荐'];
+
+function applySummaryHtml(app) {
+  return '<div class="dim" style="font-size:12.5px; margin-top:8px; line-height:1.7;">'
+    + '<b style="color:var(--text);">申请理由：</b>' + U.esc(app.apply_reason) + '<br>'
+    + (app.good_at ? '<b style="color:var(--text);">擅长方向：</b>' + U.esc(app.good_at) + '<br>' : '')
+    + (app.experience ? '<b style="color:var(--text);">游戏经历：</b>' + U.esc(app.experience) + '<br>' : '')
+    + '提交时间：' + U.fmtDate(app.created_at)
+    + '</div>';
+}
+
+function applyFormHtml() {
+  var chips = APPLY_TAGS.map(function (t) {
+    return '<span class="tag-chip" data-tag="' + t + '" onclick="this.classList.toggle(\'on\')">' + t + '</span>';
+  }).join('');
+  return ''
+    + '<div class="form-group"><label>申请理由 <span class="dim">(必填，10-200 字)</span></label>'
+    + '<textarea class="input" id="applyReason" rows="4" maxlength="200" placeholder="介绍你的写作经验 / 游戏经历，为什么想成为创作者…"></textarea>'
+    + '<div class="char-count" id="applyReasonCount">0/200</div></div>'
+    + '<div class="form-group"><label>擅长方向 <span class="dim">(选填，可多选)</span></label>'
+    + '<div>' + chips + '</div>'
+    + '<input class="input" id="applyGoodAt" maxlength="100" placeholder="也可自定义填写，逗号分隔，100 字以内">'
+    + '</div>'
+    + '<div class="form-group"><label>游戏经历 <span class="dim">(选填，200 字以内)</span></label>'
+    + '<textarea class="input" id="applyExp" rows="3" maxlength="200" placeholder="玩过哪些游戏？有无评测 / 攻略写作经验？"></textarea>'
+    + '<div class="char-count" id="applyExpCount">0/200</div></div>'
+    + '<button class="btn btn-primary btn-block" onclick="submitApply()">提交申请</button>';
+}
+
+function bindApplyForm() {
+  var reason = U.$('#applyReason'), exp = U.$('#applyExp');
+  function syncCount() {
+    var rc = U.$('#applyReasonCount'), ec = U.$('#applyExpCount');
+    rc.textContent = reason.value.length + '/200';
+    rc.classList.toggle('over', reason.value.length > 200);
+    ec.textContent = exp.value.length + '/200';
+  }
+  reason.addEventListener('input', syncCount);
+  exp.addEventListener('input', syncCount);
+  syncCount();
+}
+
 async function loadApply() {
   var body = document.getElementById('applyBody');
-  if (me.role === 'creator' || me.role === 'admin') {
+  /* 创作者 / 管理员：已拥有权限 */
+  if (isCreator()) {
     body.innerHTML = '<div class="badge badge-green">✅ 你已拥有创作者权限</div>'
       + (me.role === 'creator' ? '<a class="btn btn-primary btn-block mt-16" href="creator-work.html">进入创作者工作台 →</a>' : '');
     return;
   }
-  body.innerHTML = '<textarea class="input" id="applyReason" rows="3" placeholder="介绍你的写作经验 / 申请理由…"></textarea>'
-    + '<button class="btn btn-primary btn-block mt-16" onclick="submitApply()">提交申请</button>'
-    + '<p class="dim" id="applyStatus" style="margin-top:8px;"></p>';
-  /* 检查是否已有申请（mock：通过拉取管理员接口不可用，改为提交时后端校验；这里提示） */
-  if (U.qs('tab') === 'apply') { document.getElementById('applyCard').scrollIntoView({ behavior: 'smooth' }); }
+  /* 普通玩家：拉取最近一次申请状态 */
+  try {
+    var data = await Api.get('/users/me/creator-application');
+    if (data.status === 'pending') {
+      body.innerHTML = '<div class="badge badge-amber">⏳ 申请审核中</div>'
+        + applySummaryHtml(data.application)
+        + '<p class="dim" style="font-size:12px; margin-top:8px;">管理员审核通过后将自动升级为创作者，请耐心等待。</p>';
+    } else if (data.status === 'approved') {
+      body.innerHTML = '<div class="badge badge-green">✅ 申请已通过</div>'
+        + '<p class="dim" style="font-size:12.5px; margin-top:8px;">你的申请已通过，身份刷新后即可进入创作者工作台。</p>';
+    } else if (data.status === 'rejected') {
+      body.innerHTML = '<div class="badge badge-red">❌ 申请已驳回</div>'
+        + applySummaryHtml(data.application)
+        + '<p class="dim" style="font-size:12px; margin:8px 0;">可以完善资料后重新申请。</p>'
+        + applyFormHtml();
+      bindApplyForm();
+    } else {
+      body.innerHTML = '<p class="dim" style="font-size:12.5px; margin-bottom:10px;">通过申请后即可发布攻略与评测，'
+        + '参与精选、积分与等级体系。</p>' + applyFormHtml();
+      bindApplyForm();
+    }
+  } catch (e) {
+    body.innerHTML = '<div class="empty">' + U.esc(e.message) + '</div>';
+  }
+  if (U.qs('tab') === 'apply') {
+    var card = document.getElementById('applyCard');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.remove('flash');
+    setTimeout(function () { card.classList.add('flash'); }, 400);
+  }
 }
 
 window.submitApply = async function () {
+  var reason = document.getElementById('applyReason').value.trim();
+  /* 擅长方向：预设标签 + 自定义输入合并 */
+  var tags = Array.prototype.map.call(document.querySelectorAll('#applyBody .tag-chip.on'), function (el) { return el.dataset.tag; });
+  var custom = document.getElementById('applyGoodAt').value.trim();
+  var goodAt = tags.concat(custom ? [custom] : []).join('、').slice(0, 100);
+  var exp = document.getElementById('applyExp').value.trim();
+  /* 客户端校验，与后端规则一致 */
+  if (reason.length < 10) { U.toast('申请理由至少 10 个字，请介绍你的写作经验或游戏经历', 'error'); return; }
+  if (reason.length > 200) { U.toast('申请理由不能超过 200 个字', 'error'); return; }
+  if (exp.length > 200) { U.toast('游戏经历不能超过 200 个字', 'error'); return; }
   try {
-    await Api.post('/users/apply-creator', { apply_reason: document.getElementById('applyReason').value.trim() });
+    await Api.post('/users/apply-creator', {
+      apply_reason: reason, good_at: goodAt, experience: exp,
+    });
     U.toast('申请已提交，等待管理员审核', 'success');
+    loadApply();
   } catch (e) { U.toast(e.message, 'error'); }
 };
+
+/* ===== 身份轮询（方案一，间隔 8s）：管理员审批通过后无需 F5，角色/导航自动刷新；离开页面销毁定时器 ===== */
+var identityTimer = setInterval(async function () {
+  try {
+    var fresh = await Api.get('/users/me');
+    if (me && fresh.role !== me.role) {
+      me = fresh;
+      Api.setSession(Api.getToken(), me);
+      Auth.mountNav();   // 导航栏出现/隐藏「创作者中心」入口
+      init();            // 重绘角色徽章、积分与申请卡片
+    }
+  } catch (e) { /* 未登录等情况静默 */ }
+}, 8000);
+window.addEventListener('beforeunload', function () { clearInterval(identityTimer); });
 
 init();
 </script>

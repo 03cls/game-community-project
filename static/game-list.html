@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>游戏库 — AI 游戏社区评测分享平台</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
@@ -45,14 +45,15 @@
 <div id="footerSlot"></div>
 
 <script src="js/mock.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
 <script>
 Auth.mountNav('games');
 document.getElementById('footerSlot').innerHTML = U.footer();
 
-var state = { page: 1, category_id: '', sort: 'hot', keyword: U.qs('keyword') };
+var qsCat = parseInt(U.qs('category_id'), 10);
+var state = { page: 1, category_id: qsCat || '', sort: 'hot', keyword: U.qs('keyword') };
 
 function catTag(c, active) {
   return '<span class="tag clickable ' + (active ? 'active' : '') + '" onclick="selectCat(' + c.id + ')">' + U.esc(c.name) + '</span>';

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>审核队列 — 管理后台</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
@@ -17,6 +17,16 @@
         <tbody id="pendingBody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
       </table>
     </div>
+    <div id="pendingPager" style="margin-top:-8px; margin-bottom:16px;"></div>
+
+    <h2 class="section-title">⭐ 已发布评测管理（精选 / 抄袭处置）</h2>
+    <div class="card table-wrap mb-16">
+      <table class="data">
+        <thead><tr><th>标题</th><th>作者</th><th>创作者等级</th><th>标记</th><th>操作</th></tr></thead>
+        <tbody id="pubBody"><tr><td colspan="5" class="loading">加载中…</td></tr></tbody>
+      </table>
+    </div>
+    <div id="pubPager" style="margin-top:-8px; margin-bottom:16px;"></div>
 
     <h2 class="section-title">🤖 AI 审核日志</h2>
     <div class="card table-wrap mb-16">
@@ -25,29 +35,64 @@
         <tbody id="logBody"></tbody>
       </table>
     </div>
-
-    <h2 class="section-title">💬 评论管理</h2>
-    <div class="card table-wrap">
-      <table class="data">
-        <thead><tr><th>评论内容</th><th>评论人</th><th>所属评测</th><th>时间</th><th>操作</th></tr></thead>
-        <tbody id="commentBody"></tbody>
-      </table>
-    </div>
+    <div id="logPager" style="margin-top:-8px; margin-bottom:16px;"></div>
   </main>
 </div>
 
 <script src="../js/mock.js"></script>
-<script src="../js/api.js"></script>
-<script src="../js/auth.js"></script>
-<script src="../js/common.js"></script>
+<script src="../js/api.js?v=cmnt1"></script>
+<script src="../js/auth.js?v=cmnt1"></script>
+<script src="../js/common.js?v=cmnt1"></script>
 <script>
 if (!Auth.mountAdmin('audit')) throw new Error('redirect');
 
+var pendingSig = '';   // 数据签名：内容无变化时跳过重渲染，避免干扰管理员操作
+var PAGE_SIZE = 10;
+var pendPage = 1, pubPage = 1, logPage = 1;
+var allLogs = [], allPub = [];
+
+function renderPager(containerId, totalPages, current, onGo) {
+  document.getElementById(containerId).innerHTML = U.pagination(totalPages, current, function (p) { onGo(p); });
+}
+
 async function loadPending() {
-  var data = await Api.get('/admin/reviews/pending');
   var body = document.getElementById('pendingBody');
-  if (!data.items.length) { body.innerHTML = '<tr><td colspan="7" class="empty"><div class="icon">🎉</div>队列为空，没有待复核内容</td></tr>'; return; }
-  body.innerHTML = data.items.map(function (r) {
+  try {
+    var data = await Api.get('/admin/reviews/pending');
+    /* 轮询防抖：签名一致则不重绘 */
+    var sig = JSON.stringify(data.items.map(function (r) {
+      return [r.id, r.status, r.audit_score, r.audit_reason, r.title];
+    }));
+    if (sig === pendingSig) return;
+    pendingSig = sig;
+    if (!data.items.length) { body.innerHTML = '<tr><td colspan="7" class="empty"><div class="icon">🎉</div>队列为空，没有待复核内容</td></tr>'; document.getElementById('pendingPager').innerHTML = ''; return; }
+    var totalPages = Math.max(1, Math.ceil(data.items.length / PAGE_SIZE));
+    if (pendPage > totalPages) pendPage = totalPages;
+    var pageItems = data.items.slice((pendPage - 1) * PAGE_SIZE, pendPage * PAGE_SIZE);
+    body.innerHTML = pageItems.map(function (r) {
+      return '<tr><td style="max-width:200px;"><b>' + U.esc(r.title) + '</b></td>'
+        + '<td>' + U.esc(r.author_name) + '</td>'
+        + '<td class="dim">' + U.esc(r.game_name) + '</td>'
+        + '<td><span class="score">' + (r.audit_score != null ? r.audit_score : '-') + '</span></td>'
+        + '<td class="dim" style="max-width:240px;">' + U.esc(r.audit_reason || '-') + '</td>'
+        + '<td>' + U.reviewBadge(r.status) + '</td>'
+        + '<td class="actions">'
+        + '<a class="btn btn-sm" href="../review-detail.html?review_id=' + r.id + '" target="_blank">查看</a> '
+        + '<button class="btn btn-sm btn-primary" onclick="decide(' + r.id + ',\'pass\')">✅ 通过</button>'
+        + '<button class="btn btn-sm btn-danger" onclick="decide(' + r.id + ',\'reject\')">❌ 驳回</button>'
+        + '</td></tr>';
+    }).join('');
+    renderPager('pendingPager', totalPages, pendPage, function (p) { pendPage = p; renderPendingPage(data.items); });
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">' + U.esc(e.message) + '</td></tr>';
+  }
+}
+
+function renderPendingPage(items) {
+  var totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  var pageItems = items.slice((pendPage - 1) * PAGE_SIZE, pendPage * PAGE_SIZE);
+  var body = document.getElementById('pendingBody');
+  body.innerHTML = pageItems.map(function (r) {
     return '<tr><td style="max-width:200px;"><b>' + U.esc(r.title) + '</b></td>'
       + '<td>' + U.esc(r.author_name) + '</td>'
       + '<td class="dim">' + U.esc(r.game_name) + '</td>'
@@ -55,10 +100,12 @@ async function loadPending() {
       + '<td class="dim" style="max-width:240px;">' + U.esc(r.audit_reason || '-') + '</td>'
       + '<td>' + U.reviewBadge(r.status) + '</td>'
       + '<td class="actions">'
+      + '<a class="btn btn-sm" href="../review-detail.html?review_id=' + r.id + '" target="_blank">查看</a> '
       + '<button class="btn btn-sm btn-primary" onclick="decide(' + r.id + ',\'pass\')">✅ 通过</button>'
       + '<button class="btn btn-sm btn-danger" onclick="decide(' + r.id + ',\'reject\')">❌ 驳回</button>'
       + '</td></tr>';
   }).join('');
+  renderPager('pendingPager', totalPages, pendPage, function (p) { pendPage = p; renderPendingPage(items); });
 }
 
 window.decide = async function (id, action) {
@@ -71,9 +118,63 @@ window.decide = async function (id, action) {
   } catch (e) { U.toast(e.message, 'error'); }
 };
 
-async function loadLogs() {
-  var data = await Api.get('/admin/audit/logs');
-  document.getElementById('logBody').innerHTML = data.items.map(function (l) {
+/* ===== 已发布评测：标记精选（+30 积分）/ 抄袭下架（积分清零、等级重置） ===== */
+function renderPubPage() {
+  var body = document.getElementById('pubBody');
+  if (!allPub.length) { body.innerHTML = '<tr><td colspan="5" class="empty">暂无已发布评测</td></tr>'; document.getElementById('pubPager').innerHTML = ''; return; }
+  var totalPages = Math.max(1, Math.ceil(allPub.length / PAGE_SIZE));
+  if (pubPage > totalPages) pubPage = totalPages;
+  var pageItems = allPub.slice((pubPage - 1) * PAGE_SIZE, pubPage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (r) {
+    return '<tr><td style="max-width:240px;"><b>' + U.esc(r.title) + '</b>'
+      + (r.is_featured ? ' <span class="featured-flag">⭐ 精选</span>' : '') + '</td>'
+      + '<td>' + U.esc(r.author_name) + '</td>'
+      + '<td>' + (r.author_level != null ? Auth.levelBadge(r.author_level, { short: true, icon: false }) : '-') + '</td>'
+      + '<td class="dim">' + (r.is_featured ? '已精选' : '-') + '</td>'
+      + '<td class="actions">'
+      + '<a class="btn btn-sm" href="../review-detail.html?review_id=' + r.id + '" target="_blank">查看</a> '
+      + '<button class="btn btn-sm ' + (r.is_featured ? '' : 'btn-primary') + '" onclick="toggleFeature(' + r.id + ')">'
+      + (r.is_featured ? '取消精选' : '⭐ 标记精选') + '</button> '
+      + '<button class="btn btn-sm btn-danger" onclick="plagiarize(' + r.id + ')">🚫 抄袭下架</button>'
+      + '</td></tr>';
+  }).join('');
+  renderPager('pubPager', totalPages, pubPage, function (p) { pubPage = p; renderPubPage(); });
+}
+
+async function loadPublished() {
+  try {
+    var data = await Api.get('/reviews?page=1&page_size=100');
+    allPub = data.items;
+    renderPubPage();
+  } catch (e) {
+    document.getElementById('pubBody').innerHTML = '<tr><td colspan="5" class="empty">' + U.esc(e.message) + '</td></tr>';
+  }
+}
+
+window.toggleFeature = async function (id) {
+  try {
+    var r = await Api.post('/admin/reviews/' + id + '/feature');
+    U.toast(r.message, 'success');
+    loadPublished(); loadLogs();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+window.plagiarize = async function (id) {
+  if (!confirm('确认判定该评测抄袭违规？\n后果：评测强制下架，作者积分清零、等级重置为 L0。此操作不可撤销！')) return;
+  try {
+    var r = await Api.post('/admin/reviews/' + id + '/plagiarize');
+    U.toast(r.message, 'success');
+    loadPublished(); loadPending(); loadLogs();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+function renderLogPage() {
+  var body = document.getElementById('logBody');
+  if (!allLogs.length) { body.innerHTML = '<tr><td colspan="6" class="dim" style="text-align:center; padding:20px;">暂无日志</td></tr>'; document.getElementById('logPager').innerHTML = ''; return; }
+  var totalPages = Math.max(1, Math.ceil(allLogs.length / PAGE_SIZE));
+  if (logPage > totalPages) logPage = totalPages;
+  var pageItems = allLogs.slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (l) {
     var type = l.audit_type === 'ai' ? '<span class="badge badge-blue">AI</span>' : '<span class="badge badge-amber">人工</span>';
     var score = l.risk_score != null ? (l.risk_score >= 80 ? '<span class="badge badge-red">' + l.risk_score + '</span>' : l.risk_score >= 50 ? '<span class="badge badge-amber">' + l.risk_score + '</span>' : '<span class="badge badge-green">' + l.risk_score + '</span>') : '-';
     return '<tr><td class="dim">' + U.esc(l.review_title) + '</td><td>' + type + '</td><td>' + score + '</td>'
@@ -81,27 +182,22 @@ async function loadLogs() {
       + '<td class="dim">' + (l.operator_id === 1 ? 'system' : 'admin') + '</td>'
       + '<td class="dim">' + U.fmtDate(l.created_at) + '</td></tr>';
   }).join('');
+  renderPager('logPager', totalPages, logPage, function (p) { logPage = p; renderLogPage(); });
 }
 
-async function loadComments() {
-  var data = await Api.get('/admin/comments');
-  document.getElementById('commentBody').innerHTML = data.items.map(function (c) {
-    return '<tr><td style="max-width:320px;">' + U.esc(c.content) + '</td>'
-      + '<td>' + U.esc(c.author) + '</td>'
-      + '<td class="dim">' + U.esc(c.review_title) + '</td>'
-      + '<td class="dim">' + U.fmtDate(c.created_at) + '</td>'
-      + '<td class="actions"><button class="btn btn-sm btn-danger" onclick="delComment(' + c.id + ')">删除违规评论</button></td></tr>';
-  }).join('');
+async function loadLogs() {
+  try {
+    var data = await Api.get('/admin/audit/logs');
+    allLogs = data.items;
+    renderLogPage();
+  } catch (e) { U.toast(e.message, 'error'); }
 }
 
-window.delComment = async function (id) {
-  if (!confirm('确认删除该评论？')) return;
-  await Api.del('/admin/comments/' + id);
-  U.toast('评论已删除', 'info');
-  loadComments();
-};
+loadPending(); loadPublished(); loadLogs();
 
-loadPending(); loadLogs(); loadComments();
+/* ===== 轮询（方案一，间隔 6s）：自动拉取待审核评测列表，无需手动刷新；离开页面销毁定时器 ===== */
+var auditPollTimer = setInterval(loadPending, 6000);
+window.addEventListener('beforeunload', function () { clearInterval(auditPollTimer); });
 </script>
 </body>
 </html>

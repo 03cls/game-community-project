@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>评论管理 — 管理后台</title>
+<link rel="stylesheet" href="../css/style.css?v=proto12">
+</head>
+<body>
+<div id="navbar"></div>
+<div class="admin-layout">
+  <aside class="admin-side" id="adminSide"></aside>
+  <main class="admin-main">
+    <h2 class="section-title">💬 评论管理</h2>
+    <p class="dim" style="margin-bottom:14px;">管理全站评论（游戏短评论 + 评测攻略评论）：删除违规评论、查看点赞数据。精选评论由系统自动计算，无需人工设置。</p>
+
+    <div class="card" style="margin-bottom:14px; padding:12px;">
+      <div class="flex" style="gap:10px; align-items:center; flex-wrap:wrap;">
+        <label class="dim" style="font-size:13px;">筛选：</label>
+        <select class="input" id="fType" style="width:150px;" onchange="renderComments()">
+          <option value="">全部类型</option>
+          <option value="game">游戏评论</option>
+          <option value="review">评测评论</option>
+        </select>
+        <input class="input" id="fKw" placeholder="搜索内容/作者/所属对象" style="flex:1; min-width:200px;" oninput="onKwInput()">
+      </div>
+    </div>
+
+    <div class="card table-wrap">
+      <table class="data">
+        <thead><tr><th style="width:40%;">评论内容</th><th>作者</th><th>所属对象</th><th>点赞数</th><th>时间</th><th>操作</th></tr></thead>
+        <tbody id="commentBody"><tr><td colspan="6" class="dim" style="text-align:center; padding:20px;">加载中…</td></tr></tbody>
+      </table>
+    </div>
+    <div id="commentPager" style="margin-top:10px;"></div>
+  </main>
+</div>
+
+<script src="../js/mock.js"></script>
+<script src="../js/api.js?v=cmnt1"></script>
+<script src="../js/auth.js?v=cmnt1"></script>
+<script src="../js/common.js?v=cmnt1"></script>
+<script>
+if (!Auth.mountAdmin('comments')) throw new Error('redirect');
+
+var allComments = [];
+var kwTimer = null;
+var PAGE_SIZE = 10;
+var cmtPage = 1;
+
+async function loadComments() {
+  try {
+    var data = await Api.get('/admin/comments');
+    allComments = data.items;
+    renderComments();
+  } catch (e) {
+    U.toast(e.message, 'error');
+  }
+}
+
+function onKwInput() {
+  clearTimeout(kwTimer);
+  kwTimer = setTimeout(renderComments, 250);
+}
+
+function renderComments() {
+  var fType = document.getElementById('fType').value;
+  var kw = (document.getElementById('fKw').value || '').trim().toLowerCase();
+  var list = allComments.filter(function (c) {
+    if (fType && c.target_type !== fType) return false;
+    if (kw) {
+      var hay = (c.content + ' ' + c.author + ' ' + (c.target_title || '')).toLowerCase();
+      if (hay.indexOf(kw) < 0) return false;
+    }
+    return true;
+  });
+  var body = document.getElementById('commentBody');
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="6" class="dim" style="text-align:center; padding:20px;">没有符合条件的评论</td></tr>';
+    document.getElementById('commentPager').innerHTML = '';
+    return;
+  }
+  var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (cmtPage > totalPages) cmtPage = totalPages;
+  var pageItems = list.slice((cmtPage - 1) * PAGE_SIZE, cmtPage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (c) {
+    var typeLabel = c.target_type === 'game'
+      ? '<a href="../game-detail.html?id=' + c.target_id + '" target="_blank" style="color:var(--accent-2);">🎮 ' + U.esc(c.target_title) + '</a>'
+      : '<a href="../review-detail.html?review_id=' + c.target_id + '" target="_blank" style="color:var(--accent-2);">📝 ' + U.esc(c.target_title) + '</a>';
+    return '<tr>'
+      + '<td style="max-width:360px;"><div style="white-space:normal; word-break:break-all; line-height:1.6;">' + U.esc(c.content) + '</div></td>'
+      + '<td>' + U.esc(c.author) + '</td>'
+      + '<td style="font-size:13px;">' + typeLabel + '</td>'
+      + '<td><span class="score">❤ ' + c.like_count + '</span></td>'
+      + '<td class="dim" style="font-size:12px;">' + U.fmtDate(c.created_at) + '</td>'
+      + '<td><div class="flex" style="gap:6px; flex-wrap:wrap;">'
+      + '<a class="btn btn-sm" href="' + (c.target_type === 'game' ? '../game-detail.html?id=' + c.target_id : '../review-detail.html?review_id=' + c.target_id) + '" target="_blank">查看</a>'
+      + '<button class="btn btn-sm btn-danger" onclick="delComment(' + c.id + ')">删除</button>'
+      + '</div></td></tr>';
+  }).join('');
+  document.getElementById('commentPager').innerHTML = U.pagination(totalPages, cmtPage, function (p) {
+    cmtPage = p; renderComments();
+  });
+}
+
+window.delComment = async function (id) {
+  if (!confirm('确定删除这条评论吗？此操作不可恢复。')) return;
+  try {
+    await Api.del('/admin/comments/' + id);
+    U.toast('评论已删除', 'success');
+    await loadComments();
+  } catch (e) { U.toast(e.message, 'error'); }
+};
+
+loadComments();
+</script>
+</body>
+</html>

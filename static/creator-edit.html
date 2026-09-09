@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>评测编辑 — AI 游戏社区评测分享平台</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
@@ -28,6 +28,15 @@
           <label>标签（逗号分隔）</label>
           <input class="input" id="tags" placeholder="例如：魂系, 开放世界, 年度游戏">
         </div>
+        <div class="form-group">
+          <label>四维评分（1-10 分，必填，发布后自动聚合进游戏总评分）</label>
+          <div class="grid" style="grid-template-columns:repeat(4,1fr); gap:10px;">
+            <div><span class="dim" style="font-size:12px;">📖 剧情</span><input class="input" type="number" id="score_story" min="1" max="10" placeholder="1-10"></div>
+            <div><span class="dim" style="font-size:12px;">🎨 画面</span><input class="input" type="number" id="score_graphic" min="1" max="10" placeholder="1-10"></div>
+            <div><span class="dim" style="font-size:12px;">🎮 玩法</span><input class="input" type="number" id="score_gameplay" min="1" max="10" placeholder="1-10"></div>
+            <div><span class="dim" style="font-size:12px;">⚙️ 优化</span><input class="input" type="number" id="score_opt" min="1" max="10" placeholder="1-10"></div>
+          </div>
+        </div>
       </div>
 
       <div class="card" style="padding:0; overflow:hidden;">
@@ -43,24 +52,28 @@
       </div>
 
       <div class="flex mt-16" style="justify-content:flex-end; gap:10px;">
-        <a class="btn" href="creator-work.html">← 返回工作台</a>
+        <a class="btn" href="javascript:U.goBack('creator-work.html')">← 返回</a>
         <button class="btn" id="saveDraftBtn">💾 保存草稿</button>
-        <button class="btn btn-primary" id="submitBtn">🚀 提交审核（AI 自动审核）</button>
+        <button class="btn btn-primary" id="submitBtn">🚀 提交审核（管理员审核）</button>
       </div>
     </div>
 
     <!-- AI 助手 -->
-    <div class="ai-panel" style="position:sticky; top:76px;">
+    <div class="ai-panel" style="position:sticky; top:76px; max-height:calc(100vh - 96px);">
       <div class="ai-title">🤖 AI 攻略创作助手</div>
       <p class="dim" style="font-size:12px; margin-bottom:10px;">自动携带当前关联游戏与正文上下文</p>
-      <div class="ai-chips">
-        <span class="tag" onclick="quickAi('outline')">生成评测大纲</span>
-        <span class="tag" onclick="quickAi('tips')">通关思路</span>
-        <span class="tag" onclick="quickAi('polish')">润色文案</span>
-        <span class="tag" onclick="quickAi('pros')">分析优缺点</span>
+      <div class="ai-chips" id="aiChips">
+        <span class="tag clickable" data-action="outline">生成评测大纲</span>
+        <span class="tag clickable" data-action="tips">通关思路</span>
+        <span class="tag clickable" data-action="polish">润色文案</span>
+        <span class="tag clickable" data-action="pros">分析优缺点</span>
+        <span class="tag clickable" data-qs="帮我写一个吸引人的开头|给我一个场景感强的开场|用悬念式写法写个开头">写开头</span>
+        <span class="tag clickable" data-qs="帮我写一个总结性的结尾|写一个有升华感的结尾|结尾怎么呼应开头">写结尾</span>
+        <span class="tag clickable" data-qs="帮我起几个有记忆点的标题|起几个带悬念的标题|起几个带数字对比的标题">起标题</span>
+        <span class="tag clickable" data-qs="四维评分应该怎么给分|剧情和玩法分差很大怎么平衡|评分一般参考哪些标准">评分建议</span>
       </div>
       <div class="chat-box" id="chatBox">
-        <div class="chat-msg ai">你好！我是你的 AI 写作助手 ✨<br>我可以帮你生成评测大纲、梳理通关思路、润色文案、分析游戏优缺点。点击上方标签快速开始吧～</div>
+        <div class="chat-msg ai">你好！我是你的 AI 写作助手 ✨<br>我可以帮你生成评测大纲、梳理通关思路、润色文案、分析优缺点，也能写开头/结尾、起标题、给评分建议。点击上方标签或直接描述需求～</div>
       </div>
       <div class="ai-input-row">
         <input class="input" id="aiInput" placeholder="输入消息，回车发送…">
@@ -73,9 +86,9 @@
 <div id="footerSlot"></div>
 
 <script src="js/mock.js"></script>
-<script src="js/api.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=cmnt1"></script>
+<script src="js/auth.js?v=cmnt1"></script>
+<script src="js/common.js?v=cmnt1"></script>
 <script>
 if (!Auth.requireRole('creator')) throw new Error('redirect');
 Auth.mountNav('creator');
@@ -98,8 +111,17 @@ async function init() {
       document.getElementById('title').value = rv.title;
       document.getElementById('gameSelect').value = rv.game_id;
       document.getElementById('tags').value = (rv.tags || []).join(',');
+      ['score_story', 'score_graphic', 'score_gameplay', 'score_opt'].forEach(function (k) {
+        var el = document.getElementById(k);
+        if (el) el.value = rv[k] == null ? '' : rv[k];
+      });
       document.getElementById('editor').innerHTML = rv.content || '';
-      if (rv.status === 'published') U.toast('已发布文章为只读', 'info');
+      if (rv.status === 'published') {
+        var me = Auth.user() || {};
+        if (rv.edit_used) U.toast('该评测的 1 次编辑机会已用完，内容只读', 'info');
+        else if ((me.creator_level || 0) >= 1) U.toast('L1 权益：已发布评测可编辑保存 1 次', 'info');
+        else U.toast('L0 见习创作者不可编辑已发布评测，升至 L1（200 积分）解锁', 'info');
+      }
     }
   }
 }
@@ -119,20 +141,40 @@ window.fmt = function (cmd) {
 };
 
 function collect() {
+  var SCORE_KEYS = ['score_story', 'score_graphic', 'score_gameplay', 'score_opt'];
+  var scores = {};
+  SCORE_KEYS.forEach(function (k) {
+    var v = document.getElementById(k).value.trim();
+    if (v === '') { scores[k] = null; return; }
+    var n = parseInt(v, 10);
+    if (isNaN(n) || n < 1 || n > 10) {
+      var names = { score_story: '剧情', score_graphic: '画面', score_gameplay: '玩法', score_opt: '优化' };
+      throw { __input: true, msg: names[k] + '评分必须是 1-10 的整数' };
+    }
+    scores[k] = n;
+  });
   return {
     title: document.getElementById('title').value.trim(),
     game_id: parseInt(document.getElementById('gameSelect').value, 10),
     tags: document.getElementById('tags').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean),
-    content: document.getElementById('editor').innerHTML
+    content: document.getElementById('editor').innerHTML,
+    score_story: scores.score_story,
+    score_graphic: scores.score_graphic,
+    score_gameplay: scores.score_gameplay,
+    score_opt: scores.score_opt
   };
 }
 
 async function saveDraft() {
-  var body = collect();
+  var body;
+  try { body = collect(); }
+  catch (e) { if (e && e.__input) { U.toast(e.msg, 'error'); return null; } throw e; }
   if (!body.title) { U.toast('请先填写标题', 'error'); return null; }
   try {
-    if (editId) { await Api.put('/reviews/' + editId, body); U.toast('草稿已保存', 'success'); }
-    else {
+    if (editId) {
+      var upd = await Api.put('/reviews/' + editId, body);
+      U.toast(upd.status === 'published' ? '已发布评测已更新（1 次编辑机会已使用）' : '草稿已保存', 'success');
+    } else {
       var r = await Api.post('/reviews', body);
       editId = r.id;
       history.replaceState(null, '', 'creator-edit.html?id=' + editId);
@@ -145,8 +187,13 @@ async function saveDraft() {
 document.getElementById('saveDraftBtn').onclick = saveDraft;
 
 document.getElementById('submitBtn').onclick = async function () {
-  var body = collect();
+  var body;
+  try { body = collect(); }
+  catch (e) { if (e && e.__input) { U.toast(e.msg, 'error'); return; } throw e; }
   if (!body.title) { U.toast('请先填写标题', 'error'); return; }
+  if (body.score_story == null || body.score_graphic == null || body.score_gameplay == null || body.score_opt == null) {
+    U.toast('提交审核前请填写全部四维评分（1-10 分）', 'error'); return;
+  }
   if (!body.content || body.content.replace(/<[^>]+>/g, '').trim().length < 20) {
     U.toast('正文内容太少了，至少写点什么吧', 'error'); return;
   }
@@ -155,16 +202,14 @@ document.getElementById('submitBtn').onclick = async function () {
   if (!ok) return;
   try {
     var res = await Api.post('/reviews/' + editId + '/submit-audit');
-    if (res.status === 'published') {
-      U.toast('🎉 AI 审核通过，文章已发布！', 'success');
-      setTimeout(function () { location.href = 'creator-work.html'; }, 1500);
+    if (res.status === 'pending') {
+      U.toast('⏳ ' + (res.message || '已提交审核，等待管理员审核'), 'info');
+    } else if (res.status === 'published') {
+      U.toast('🎉 审核通过，文章已发布！', 'success');
     } else if (res.status === 'rejected') {
-      U.toast('❌ AI 驳回：' + res.audit.reasons.join('；'), 'error');
-      setTimeout(function () { location.href = 'creator-work.html'; }, 2000);
-    } else {
-      U.toast('⏳ 内容存疑，已转入管理员人工复核队列', 'info');
-      setTimeout(function () { location.href = 'creator-work.html'; }, 1800);
+      U.toast('❌ 已驳回：' + (res.audit && res.audit.reasons ? res.audit.reasons.join('；') : ''), 'error');
     }
+    setTimeout(function () { location.href = 'creator-work.html'; }, 1500);
   } catch (e) { U.toast(e.message, 'error'); }
 };
 
@@ -192,7 +237,11 @@ function addMsg(text, who) {
   box.scrollTop = box.scrollHeight;
 }
 
+var aiBusy = false;
+
 async function askAi(message, action) {
+  if (aiBusy) { U.toast('AI 还在思考，稍等一下～', 'info'); return; }
+  aiBusy = true;
   addMsg(message, 'me');
   var body = collect();
   var box = document.getElementById('chatBox');
@@ -213,6 +262,8 @@ async function askAi(message, action) {
   } catch (e) {
     loading.remove();
     addMsg('出错了：' + e.message, 'ai');
+  } finally {
+    aiBusy = false;
   }
 }
 
@@ -220,6 +271,27 @@ window.quickAi = function (action) {
   var map = { outline: '帮我生成一篇评测大纲', tips: '给我一些通关思路', polish: '帮我润色当前文案', pros: '分析一下这款游戏的优缺点' };
   askAi(map[action], action);
 };
+
+window.quickAskC = function (q) {
+  var input = document.getElementById('aiInput');
+  if (input.disabled) return;   // 上一条请求还在处理，避免重复发送
+  input.value = '';
+  askAi(q, '');
+};
+
+/* 快捷标签：事件委托；data-action 直发，data-qs 按顺序轮换发送候选问题 */
+document.getElementById('aiChips').addEventListener('click', function (e) {
+  var t = e.target.closest('.tag');
+  if (!t) return;
+  if (t.dataset.action) { quickAi(t.dataset.action); return; }
+  if (t.dataset.qs) {
+    var qs = t.dataset.qs.split('|').filter(Boolean);
+    if (!qs.length) return;
+    var i = parseInt(t.dataset.mi || '0', 10) % qs.length;
+    t.dataset.mi = String(i + 1);
+    quickAskC(qs[i]);
+  }
+});
 
 document.getElementById('aiSend').onclick = function () {
   var input = document.getElementById('aiInput');

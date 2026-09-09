@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>用户管理 — 管理后台</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
@@ -13,10 +13,11 @@
     <h2 class="section-title">📝 创作者申请处理</h2>
     <div class="card table-wrap mb-16">
       <table class="data">
-        <thead><tr><th>申请人</th><th>邮箱</th><th>申请理由</th><th>提交时间</th><th>状态</th><th>操作</th></tr></thead>
-        <tbody id="applyBody"><tr><td colspan="6" class="loading">加载中…</td></tr></tbody>
+        <thead><tr><th>申请人</th><th>邮箱</th><th>申请理由</th><th>擅长方向 / 经历</th><th>提交时间</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="applyBody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
       </table>
     </div>
+    <div id="applyPager" style="margin-top:-8px; margin-bottom:16px;"></div>
 
     <h2 class="section-title">👥 用户管理</h2>
     <div class="flex mb-16">
@@ -29,30 +30,96 @@
         <tbody id="userBody"></tbody>
       </table>
     </div>
+    <div id="userPager" style="margin-top:10px;"></div>
   </main>
 </div>
 
 <script src="../js/mock.js"></script>
-<script src="../js/api.js"></script>
-<script src="../js/auth.js"></script>
-<script src="../js/common.js"></script>
+<script src="../js/api.js?v=cmnt1"></script>
+<script src="../js/auth.js?v=cmnt1"></script>
+<script src="../js/common.js?v=cmnt1"></script>
 <script>
 if (!Auth.mountAdmin('users')) throw new Error('redirect');
 
+var applySig = '';   // 数据签名：内容无变化时跳过重渲染，避免干扰管理员操作
+var PAGE_SIZE = 10;
+var applyPage = 1, userPage = 1;
+var lastApplies = [], allUsers = [];
+
+function applyStatusBadge(status) {
+  return { pending: '<span class="badge badge-amber">待审核</span>',
+    approved: '<span class="badge badge-green">已通过</span>',
+    rejected: '<span class="badge badge-red">已驳回</span>' }[status] || U.esc(status);
+}
+
 async function loadApplies() {
-  var data = await Api.get('/admin/creator-apply');
   var body = document.getElementById('applyBody');
-  if (!data.items.length) { body.innerHTML = '<tr><td colspan="6" class="empty dim">暂无申请记录</td></tr>'; return; }
-  body.innerHTML = data.items.map(function (a) {
-    var statusMap = { pending: '<span class="badge badge-amber">待审核</span>', approved: '<span class="badge badge-green">已通过</span>', rejected: '<span class="badge badge-red">已驳回</span>' };
+  try {
+    var data = await Api.get('/admin/creator-apply');
+    /* 轮询防抖：签名一致则不重绘 */
+    var sig = JSON.stringify(data.items.map(function (a) {
+      return [a.id, a.status, a.username, a.apply_reason, a.good_at, a.experience, a.created_at];
+    }));
+    if (sig === applySig) return;
+    applySig = sig;
+    lastApplies = data.items;
+    renderApplyPage();
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="7" class="empty dim">' + U.esc(e.message) + '</td></tr>';
+  }
+}
+
+function renderApplyPage() {
+  var body = document.getElementById('applyBody');
+  if (!lastApplies.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty dim">暂无申请记录</td></tr>';
+    document.getElementById('applyPager').innerHTML = '';
+    return;
+  }
+  var totalPages = Math.max(1, Math.ceil(lastApplies.length / PAGE_SIZE));
+  if (applyPage > totalPages) applyPage = totalPages;
+  var pageItems = lastApplies.slice((applyPage - 1) * PAGE_SIZE, applyPage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (a) {
     var ops = a.status === 'pending'
       ? '<button class="btn btn-sm btn-primary" onclick="dealApply(' + a.id + ',\'approve\')">同意</button> <button class="btn btn-sm btn-danger" onclick="dealApply(' + a.id + ',\'reject\')">驳回</button>'
       : '<span class="dim">已处理</span>';
+    var skill = (a.good_at ? '<div>' + U.esc(a.good_at) + '</div>' : '')
+      + (a.experience ? '<div class="dim" style="font-size:12px; max-width:220px;">' + U.esc(a.experience) + '</div>' : '');
+    if (!skill) skill = '<span class="dim">—</span>';
     return '<tr><td>' + U.esc(a.username) + '</td><td class="dim">' + U.esc(a.nickname) + '</td>'
-      + '<td class="dim" style="max-width:280px;">' + U.esc(a.apply_reason) + '</td>'
-      + '<td class="dim">' + U.fmtDate(a.created_at) + '</td><td>' + statusMap[a.status] + '</td><td class="actions">' + ops + '</td></tr>';
+      + '<td class="dim" style="max-width:240px;">' + U.esc(a.apply_reason) + '</td>'
+      + '<td style="max-width:240px;">' + skill + '</td>'
+      + '<td class="dim">' + U.fmtDate(a.created_at) + '</td><td>' + applyStatusBadge(a.status) + '</td>'
+      + '<td class="actions"><button class="btn btn-sm" onclick="viewApply(' + a.id + ')">查看</button> ' + ops + '</td></tr>';
   }).join('');
+  document.getElementById('applyPager').innerHTML = U.pagination(totalPages, applyPage, function (p) {
+    applyPage = p; renderApplyPage();
+  });
 }
+
+/* 查看申请完整内容（弹窗），待审核的可直接在弹窗里审批 */
+window.viewApply = function (id) {
+  var a = lastApplies.filter(function (x) { return x.id === id; })[0];
+  if (!a) return;
+  var block = function (label, val) {
+    return '<div class="form-group"><label>' + label + '</label>'
+      + '<div class="card" style="padding:10px 12px; white-space:normal; word-break:break-all; line-height:1.7;">' + (val || '<span class="dim">—</span>') + '</div></div>';
+  };
+  var foot = a.status === 'pending'
+    ? '<div class="modal-foot"><button class="btn btn-primary" onclick="U.closeModal(); dealApply(' + a.id + ',\'approve\')">✅ 同意</button>'
+      + '<button class="btn btn-danger" onclick="U.closeModal(); dealApply(' + a.id + ',\'reject\')">❌ 驳回</button>'
+      + '<button class="btn" onclick="U.closeModal()">关闭</button></div>'
+    : '<div class="modal-foot"><button class="btn" onclick="U.closeModal()">关闭</button></div>';
+  U.openModal('<h3>📝 创作者申请详情</h3>'
+    + '<div class="form-group"><label>申请人</label><div>'
+    + U.esc(a.nickname || a.username) + '（' + U.esc(a.username) + ' · ' + U.esc(a.email || '') + '）'
+    + ' <span style="margin-left:6px;">' + applyStatusBadge(a.status) + '</span></div></div>'
+    + block('申请理由', U.esc(a.apply_reason || ''))
+    + block('擅长方向', U.esc(a.good_at || ''))
+    + block('游戏经历', U.esc(a.experience || ''))
+    + '<div class="form-group"><label>提交时间</label><div class="dim">' + U.fmtDate(a.created_at) + '</div></div>'
+    + foot);
+};
 
 window.dealApply = async function (id, action) {
   if (action === 'approve' && !confirm('确认通过该申请？用户将获得创作者权限')) return;
@@ -67,7 +134,15 @@ window.dealApply = async function (id, action) {
 async function loadUsers() {
   var kw = document.getElementById('userKw').value.trim();
   var data = await Api.get('/admin/users' + (kw ? '?keyword=' + encodeURIComponent(kw) : ''));
-  document.getElementById('userBody').innerHTML = data.items.map(function (u) {
+  allUsers = data.items;
+  renderUserPage();
+}
+
+function renderUserPage() {
+  var totalPages = Math.max(1, Math.ceil(allUsers.length / PAGE_SIZE));
+  if (userPage > totalPages) userPage = totalPages;
+  var pageItems = allUsers.slice((userPage - 1) * PAGE_SIZE, userPage * PAGE_SIZE);
+  document.getElementById('userBody').innerHTML = pageItems.map(function (u) {
     var roleBadge = '<span class="badge ' + Auth.roleBadge[u.role] + '">' + Auth.roleName[u.role] + '</span>';
     var status = u.is_active ? '<span class="badge badge-green">正常</span>' : '<span class="badge badge-red">已封禁</span>';
     var ops = '';
@@ -83,7 +158,10 @@ async function loadUsers() {
     return '<tr><td>' + u.id + '</td><td>' + U.esc(u.username) + '</td><td>' + U.esc(u.profile.nickname) + '</td>'
       + '<td class="dim">' + U.esc(u.email) + '</td><td>' + roleBadge + '</td><td>' + status + '</td>'
       + '<td class="dim">' + U.fmtDate(u.created_at) + '</td><td class="actions">' + ops + '</td></tr>';
-  }).join('');
+  }).join('') || '<tr><td colspan="8" class="empty dim">没有符合条件的用户</td></tr>';
+  document.getElementById('userPager').innerHTML = U.pagination(totalPages, userPage, function (p) {
+    userPage = p; renderUserPage();
+  });
 }
 
 window.toggleStatus = async function (id, active) {
@@ -106,6 +184,10 @@ window.setRole = async function (id, role) {
 
 document.getElementById('userKw').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadUsers(); });
 loadApplies(); loadUsers();
+
+/* ===== 轮询（方案一，间隔 6s）：自动拉取创作者申请列表，新申请几秒内出现；离开页面销毁定时器 ===== */
+var applyPollTimer = setInterval(loadApplies, 6000);
+window.addEventListener('beforeunload', function () { clearInterval(applyPollTimer); });
 </script>
 </body>
 </html>

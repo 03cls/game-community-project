@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>游戏管理 — 管理后台</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/style.css?v=proto12">
 </head>
 <body>
 <div id="navbar"></div>
@@ -17,6 +17,7 @@
         <tbody id="gameBody"></tbody>
       </table>
     </div>
+    <div id="gamePager" style="margin-top:-8px; margin-bottom:16px;"></div>
 
     <h2 class="section-title">📂 游戏分类管理 <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="addCategory()">＋ 新增分类</button></h2>
     <div class="card table-wrap">
@@ -25,23 +26,30 @@
         <tbody id="catBody"></tbody>
       </table>
     </div>
+    <div id="catPager" style="margin-top:10px;"></div>
   </main>
 </div>
 
 <script src="../js/mock.js"></script>
-<script src="../js/api.js"></script>
-<script src="../js/auth.js"></script>
-<script src="../js/common.js"></script>
+<script src="../js/api.js?v=cmnt1"></script>
+<script src="../js/auth.js?v=cmnt1"></script>
+<script src="../js/common.js?v=cmnt1"></script>
 <script>
 if (!Auth.mountAdmin('games')) throw new Error('redirect');
 
 var categories = [];
+var allGames = [];
+var PAGE_SIZE = 10;
+var gamePage = 1, catPage = 1;
 
-async function loadGames() {
-  var data = await Api.get('/admin/games');
-  categories = data.categories;
-  document.getElementById('gameBody').innerHTML = data.items.map(function (g) {
-    return '<tr><td><img src="' + U.esc(g.cover_url) + '" style="width:80px; aspect-ratio:16/9; object-fit:cover; border-radius:6px;"></td>'
+function renderGamePage() {
+  var body = document.getElementById('gameBody');
+  if (!allGames.length) { body.innerHTML = '<tr><td colspan="8" class="empty">暂无游戏</td></tr>'; document.getElementById('gamePager').innerHTML = ''; return; }
+  var totalPages = Math.max(1, Math.ceil(allGames.length / PAGE_SIZE));
+  if (gamePage > totalPages) gamePage = totalPages;
+  var pageItems = allGames.slice((gamePage - 1) * PAGE_SIZE, gamePage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (g) {
+    return '<tr><td><img src="' + U.esc(g.cover_url) + '" style="width:80px; aspect-ratio:16/9; object-fit:cover; border-radius:6px;" onerror="coverError(this)"></td>'
       + '<td><b>' + U.esc(g.name) + '</b><br><span class="dim">' + U.esc(g.name_en) + '</span></td>'
       + '<td class="dim">' + U.esc(g.developer || '-') + '</td>'
       + '<td><span class="tag">' + U.esc(g.category_name) + '</span></td>'
@@ -49,10 +57,21 @@ async function loadGames() {
       + '<td class="dim">' + U.fmtDate(g.release_date) + '</td>'
       + '<td>' + (g.is_online ? '<span class="badge badge-green">上架中</span>' : '<span class="badge badge-gray">已下架</span>') + '</td>'
       + '<td class="actions">'
+      + '<a class="btn btn-sm" href="../game-detail.html?id=' + g.id + '" target="_blank">查看</a> '
       + '<button class="btn btn-sm" onclick="openGameModal(' + g.id + ')">编辑</button>'
       + '<button class="btn btn-sm btn-danger" onclick="toggleOnline(' + g.id + ',' + (g.is_online ? 'false' : 'true') + ')">' + (g.is_online ? '下架' : '上架') + '</button>'
       + '</td></tr>';
   }).join('');
+  document.getElementById('gamePager').innerHTML = U.pagination(totalPages, gamePage, function (p) {
+    gamePage = p; renderGamePage();
+  });
+}
+
+async function loadGames() {
+  var data = await Api.get('/admin/games');
+  categories = data.categories;
+  allGames = data.items;
+  renderGamePage();
 }
 
 window.toggleOnline = async function (id, online) {
@@ -108,14 +127,30 @@ window.saveGame = async function (id) {
 };
 
 /* ---------- 分类 ---------- */
-async function loadCats() {
-  var data = await Api.get('/admin/categories');
-  categories = data.items;
-  document.getElementById('catBody').innerHTML = data.items.map(function (c) {
+var allCats = [];
+var catPage = 1;
+
+function renderCatPage() {
+  var body = document.getElementById('catBody');
+  if (!allCats.length) { body.innerHTML = '<tr><td colspan="3" class="empty">暂无分类</td></tr>'; document.getElementById('catPager').innerHTML = ''; return; }
+  var totalPages = Math.max(1, Math.ceil(allCats.length / PAGE_SIZE));
+  if (catPage > totalPages) catPage = totalPages;
+  var pageItems = allCats.slice((catPage - 1) * PAGE_SIZE, catPage * PAGE_SIZE);
+  body.innerHTML = pageItems.map(function (c) {
     return '<tr><td>' + c.id + '</td><td>' + U.esc(c.name) + '</td>'
       + '<td class="actions"><button class="btn btn-sm" onclick="renameCat(' + c.id + ',\'' + U.esc(c.name) + '\')">改名</button>'
       + '<button class="btn btn-sm btn-danger" onclick="delCat(' + c.id + ')">删除</button></td></tr>';
   }).join('');
+  document.getElementById('catPager').innerHTML = U.pagination(totalPages, catPage, function (p) {
+    catPage = p; renderCatPage();
+  });
+}
+
+async function loadCats() {
+  var data = await Api.get('/admin/categories');
+  categories = data.items;
+  allCats = data.items;
+  renderCatPage();
 }
 
 window.addCategory = async function () {
