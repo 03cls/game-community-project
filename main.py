@@ -59,6 +59,14 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/")
+def root():
+    """根路径直达首页（云部署根网址打开即用）。"""
+    from fastapi.responses import RedirectResponse
+
+    return RedirectResponse(url="/static/index.html")
+
+
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(games_router)
